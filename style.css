@@ -1,0 +1,124 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 1px solid red;
+}
+
+body {
+  background-color: white;
+}
+
+h1 {
+  text-align: center;
+}
+
+#chat-window {
+  width: 400px;
+  margin: 20px auto;
+  text-align: center;
+  heigth: 800px;
+  min-height: 800px;
+  position: relative;
+  background-color: cyan;
+  border: 5px solid black;
+  border-radius: 15px;
+}
+
+#message-window {
+  overflow: scroll;
+  position: absolute;
+  top: 40px;
+  width: 100%;
+  bottom: 60px;
+}
+
+#chat-input {
+  margin-top: 30px;
+  position: absolute;
+  bottom: 6px;
+  right: 0px;
+  text-align: left;
+  width: 100%;
+  height: 40px;
+}
+
+/* messages */
+
+.message {
+  margin: 10px;
+}
+
+.bot-message {
+  text-align: left;
+}
+
+.human-message {
+  text-align: right;
+}
+
+/* bubbles */
+
+.bubble {
+  display: inline-block;
+  width: 85%;
+  padding: 10px;
+  border-radius: 15px;
+}
+
+.bot-bubble {
+  text-align: left;
+  background-color: green;
+  border: 2px solid orange;
+}
+
+.human-bubble {
+  text-align: left;
+  background-color: yellow;
+  border: 2px solid orange;
+}
+
+/* name-tags */
+
+.nametag {
+  font-size: 0.8em;
+}
+
+.human-nametag {
+
+.bot-nametag {
+}
+
+/* chat-text and timestamp */
+
+.chat-text {
+  margin: 5px 0;
+}
+
+.human-chat-text {
+}
+
+.bot-chat-text {
+}
+
+.message-timestamp {
+  text-align: right;
+  font-size: 0.8em;
+}
+
+/* avatar display */
+
+#message-window img {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  overflow: hidden;
+  display: inline-block;
+  background-color: red;
+}
+
+.bot-message img {
+}
+
+.human-message img {
+}
