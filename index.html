@@ -13,20 +13,34 @@
   <body>
 
     <header>
-      <h1>Chatty</h1>
+      <h1>Online-Friends-Simulator</h1>
     </header>
 
-    <section id="chat-window">
-      <h2>Chatty</h2>
+    <section id="main">
 
-      <section id="message-window">
+      <section id="participants-window">
+        <div class="participant" id="human">
+          <img class="participant-avatar" src="" alt="your avatar" />
+          <p class="participant-name">You</p>
+        </div>
       </section>
 
-      <form id="chat-form" action="" method="">
-        <input name="chat-input" id="chat-input" placeholder="your message" />
-      </form>
+      <section id="chat-window">
+
+        <section id="message-window">
+        </section>
+
+        <form id="chat-form" action="" method="">
+          <input name="chat-input" id="chat-input" placeholder="your message" />
+        </form>
+
+      </section>
 
     </section>
+
+    <footer>
+      Copyright/Contact/etc
+    </footer>
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
     <script src="./script.js"></script>
