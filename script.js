@@ -1,6 +1,31 @@
-/////////////////
-//// classes ////
-/////////////////
+///////////////////////
+//// basic utility ////
+///////////////////////
+
+// Formula taken from:
+// https://stackoverflow.com/questions/16110758/generate-random-number-with-a-non-uniform-distribution
+const randomNumber = (bias) => {
+  if (bias === "none") {
+    return Math.random();
+  }
+  let beta = Math.sin(Math.random() * Math.PI / 2) ** 2;
+  if (bias === "polar") {
+    return beta;
+  }
+  else if (bias === "left") {
+    return beta < 0.5 ? 2 * beta : 2 * (1 - beta);
+  }
+  else if (bias === "right") {
+    return beta > 0.5 ? 2 * beta - 1 : 2 * (1 - beta) - 1;
+  }
+  else {
+    return false;
+  }
+}
+
+/////////////////////////////
+//// participant classes ////
+/////////////////////////////
 
 //// ChatParticipant ////
 
@@ -13,6 +38,7 @@ class ChatParticipant {
     this._font = font;
     this._avatar = avatar;
     this._friendsWith = [];
+    this._ignored = [];
     this._hasGreeted = false;
     this._timeSinceInteraction = 0;
     this._isHuman = true;
@@ -58,9 +84,7 @@ class ChatParticipant {
   // output:      a randomly generated chatters name as a string
   // sideeffects: none
   static randomName() {
-    let str = Math.floor(Math.random() * 65535).toString(16);
-    console.log(str);
-    return str;
+    return Math.floor(Math.random() * 65535).toString(16);
   }
 
   // input:       none
@@ -156,30 +180,145 @@ class ChatBot extends ChatParticipant {
   }
 }
 
+///////////////////////////////
+//// message-content class ////
+///////////////////////////////
+
+// from:      participant who sends the message
+// to:        participant who is addressed (can be "none")
+// types:     greeting, gossip, initiative, goodbye, none
+// about:     can be used for gossip (can be "none")
+// mood:      0.0 - 1.0 the larger the more friendly
+// content:   is a jQuery-object
+class Message {
+  constructor(from,to,type,about) {
+    this._from = from;
+    this._to = to;
+    this._type = type;
+    this._about = about;
+    this._mood = randomNumber("none");
+    this._content = this.constructor.makeContent(from,to,type,about,this._mood);
+  }
+
+  // setters and getters
+  get from()    { return this._from; }
+  get to()      { return this._to; }
+  get type()    { return this._type; }
+  get about()   { return this._about; }
+  get mood()    { return this._mood; }
+  get content() { return this._content; }
+
+  set from(from)        { this._from = from; }
+  set to(to)            { this._to = to; }
+  set type(type)        { this._type = type; }
+  set about(about)      { this._about = about; }
+  set mood(mood)        { this._mood = mood; }
+  set content(content)  { this._content = content; }
+
+  // static methods
+
+  static makeContent(from,to,type,about,mood) {
+    switch (type) {
+      case "greeting":    return this.makeGreeting(to,mood);
+      case "gossip":      return this.makeGossip(to,about,mood);
+      case "initiative":  return this.makeInitiative(to,mood);
+      case "goodbye":     return this.makeGoodbye(to,mood);
+      default:            return $("<div>");
+    }
+  }
+
+  static makeGreeting(to,mood) {
+    console.log(to);
+    if (mood < 0.33) {
+      return $("<div>").text(`Oh no! ${to.name} is here!`);
+    }
+    else if (mood < 0.66) {
+      return $("<div>").text(`Hey, ${to.name}!`);
+    }
+    else {
+      return $("<div>").text(`${to.name}!!!!! I am soooo glad you came!!!`);
+    }
+  }
+
+  static makeGossip(to,about,mood) {
+    if (to !== "none") {
+      if (mood < 0.33) {
+        return $("<div>").text(`Hey ${to.name}, look at ${about.name}! That's a jerk if I have seen one!`);
+      }
+      else if (mood < 0.66) {
+        return $("<div>").text(`Hey ${to.name}, what do you think about ${about.name}?`);
+      }
+      else {
+        return $("<div>").text(`Hey ${to.name} don't you think ${about.name} is just the bet person around?`);
+      }
+    }
+    else {
+      if (mood < 0.33) {
+        return $("<div>").text(`Hey ${to.name}, don't you think, that there are really no decent people around in this chat?`);
+      }
+      else if (mood < 0.66) {
+        return $("<div>").text(`Hey ${to.name}, what do you think about this chat today?`);
+      }
+      else {
+        return $("<div>").text(`Hey ${to.name}, isn't it great to be among all these good people in this chat?`);
+      }
+    }
+  }
+
+  static makeInitiative(to,mood) {
+    if (to !== "none") {
+      if (mood < 0.33) {
+        return $("<div>").text(`There is so much lag for me today. I guess there are just too many of you guys.`);
+      }
+      else if (mood < 0.66) {
+        return $("<div>").text(`Hey peoples what's buzzin'?`);
+      }
+      else {
+        return $("<div>").text(`I feel sooo great about pretty much everything in this world. This chat is no exception!`);
+      }
+    }
+    else {
+      if (mood < 0.33) {
+        return $("<div>").text(`${to.name}?!? what kind of lame name is that?`);
+      }
+      else if (mood < 0.66) {
+        return $("<div>").text(`${to.name} what do you think about marshmallows?`);
+      }
+      else {
+        return $("<div>").text(`${to.name}, I really like the color you choose! You must be a person culture!`);
+      }
+    }
+  }
+
+  static makeGoodbye(to,mood) {
+    if (to !== "none") {
+      if (mood < 0.33) {
+        return $("<div>").text(`This chat really is the worst! I'm out.`);
+      }
+      else if (mood < 0.66) {
+        return $("<div>").text(`Gotta get bouncn'`);
+      }
+      else {
+        return $("<div>").text(`My heart cries. I have to leave this chat. Goodbye to all my friends!!!!`);
+      }
+    }
+    else {
+      if (mood < 0.33) {
+         return $("<div>").text(`I am glad you leave ${to.name}. I certainly won't miss you!`);
+      }
+      else if (mood < 0.66) {
+        return $("<div>").text(`Bye ${to.name}, see you around!`);
+      }
+      else {
+        return $("<div>").text(`Don't leave me ${to.name}!!!! Please come back soon. I will miss you!!!`);
+      }
+    }
+  }
+}
+
 /////////////////////////
 //// general control ////
 /////////////////////////
-
-// Formula taken from:
-// https://stackoverflow.com/questions/16110758/generate-random-number-with-a-non-uniform-distribution
-const randomNumber = (bias) => {
-  if (bias === "none") {
-    return Math.random();
-  }
-  let beta = Math.sin(Math.random() * Math.PI / 2) ** 2;
-  if (bias === "polar") {
-    return beta;
-  }
-  else if (bias === "left") {
-    return beta < 0.5 ? 2 * beta : 2 * (1 - beta);
-  }
-  else if (bias === "right") {
-    return beta > 0.5 ? 2 * beta - 1 : 2 * (1 - beta) - 1;
-  }
-  else {
-    return false;
-  }
-}
 
 // input:       none
 // output:      string of format "HH:mm dd/MM/yyyy" representing current (local) time
@@ -208,10 +347,10 @@ const scrollToBottom = (jqObject) => {
 }
 
 // INCOMPLETE DOCUMENTATION
-const sendSystemMessage = (message) => {
+const sendSystemMessage = (html) => {
   $("<div>")
     .addClass("message system-message")
-    .html(getTimeString() + ": " + message)
+    .html(getTimeString() + ": " + html)
     .appendTo($("#message-window"));
   scrollToBottom($("#message-window"));
 }
@@ -253,29 +392,31 @@ const addParticipantToScreen = (chatParticipant) => {
 // sideeffects: none
 //
 // To think about: define helper functions especially for avatar-image
-const makeMessage = (chatParticipant,content) => {
+// input:     Message object
+const makeMessageRepresentation = (message) => {
 
   // make name-tag
   let $nameTag = $("<p>")
                     .addClass("nametag")
-                    .css("color",chatParticipant.colorSecondary)
-                    .css("font-famliy",chatParticipant.font)
-                    .text(chatParticipant.name + ":");
+                    .css("color",message.from.colorSecondary)
+                    .css("font-famliy",message.from.font)
+                    .text(message.from.name + ":");
 
   // make chat-text
-  let $newContent = $("<p>")
+  let $newContent = message
+                      .content
                       .addClass("message-content")
-                      .html(content);
+                      .html(message.content.text());
 
   // make timestamp
   let $newTimestamp = $("<p>")
                         .addClass("timestamp")
-                        .css("color",chatParticipant.colorSecondary)
+                        .css("color",message.from.colorSecondary)
                         .text(getTimeString());
 
   // make text-bubble
   let $newBubble = $("<div>")
-                      .css("background-color",chatParticipant.colorPrimary)
+                      .css("background-color",message.from.colorPrimary)
                       .addClass("bubble");
 
   // add chat-text and timestamp to text-bubble
@@ -284,18 +425,18 @@ const makeMessage = (chatParticipant,content) => {
   $newTimestamp.appendTo($newBubble);
 
   // make message element
-  let $newMessage = $("<div>")
-                      .addClass("message " + (chatParticipant.isHuman ? "human" : "bot") + "-message");
+  let $newMessageRepresentation = $("<div>")
+                                    .addClass("message " + (message.from.isHuman ? "human" : "bot") + "-message");
 
   // add text-bubble and avatar-image to message element
-  $newBubble.appendTo($newMessage);
+  $newBubble.appendTo($newMessageRepresentation);
   
-  return $newMessage;
+  return $newMessageRepresentation;
 }
 
 // INCOMPLETE DOCUMENTATION
-const postMessage = (chatParticipant,content) => {
-  makeMessage(chatParticipant,content).appendTo($("#message-window"))
+const postMessage = (message) => {
+  makeMessageRepresentation(message).appendTo($("#message-window"))
   scrollToBottom($("#message-window"));
 }
 
@@ -306,12 +447,14 @@ const postMessage = (chatParticipant,content) => {
 // used to store references to all bots in the chat-room
 const botArray = [];
 
+/*
 // input:       chatBot-object and a message it should respond to as a string
 // output:      the response message of the bot
 // sideeffects: none
 const makeBotResponse = (chatBot,chatParticipant,input) => {
   return "Hello good Sir how are we doing today I was wondering about the state of your juice press which is not uncommen to believe these days in time.";
 }
+*/
 
 // input:       none
 // output:      reference to a randomly chosen non-busy bot, if no such bot exists return false
@@ -348,10 +491,34 @@ const botEntersChat = () => {
   return newBot;
 }
 
-const botLeavesChat = (chatBot) => {
+// bot representation is removed from $("#participants-window)
+// and all references to bot get removed
+const botExitChat = (chatBot) => {
   $("#" + chatBot.name).remove();
   sendSystemMessage("<span style=\"font-family: " + chatBot.font + "\">" + chatBot.name + "</span> has left the chat.");
   botArray.splice(botArray.find(x => x.name === name),1);
+}
+
+// if chance bot says bye after delay, then leaves after another delay
+// otherwise just leaves after delay
+// bot is busy during delays
+const botLeavingProcess = (chatBot) => {
+  chatBot.busy = true;
+  if (randomNumber("none") > 0.5) {
+    let leaveMessage = "Bye!";
+    let writeDelay = botTypingDelay(chatBot,"",leaveMessage) + 1000;
+    setTimeout(() => {
+        postMessage(chatBot,leaveMessage);
+        setTimeout(botExitChat,
+                   randomNumber("left") * 5000 + 2000,
+                   chatBot);
+      },writeDelay);
+  }
+  else {
+    setTimeout(botExitChat,
+               randomNumber("left") * 5000 + 2000,
+               chatBot);
+  }
 }
 
 // botTypingDelay()
@@ -363,11 +530,8 @@ const botLeavesChat = (chatBot) => {
 //              input length is wighted less as the bot's reading speed should
 //              be sumulated faster as the bot's typing speed
 // sideeffects: none
-const botTypingDelay = (chatBot,input,Message) => {
-  return 800 + (botMessage.length + input.length / 2)* (Math.floor(Math.random() * 200) + 20)
-}
-
-const botSatisfaction = (chatBot) => {
+const botTypingDelay = (inputMessage,botResponse) => {
+  return 800 + (botResponse.content.text().length + inputMessage.content.text().length / 2)* (Math.floor(Math.random() * 200) + 20)
 }
 
 // edgeFactor()
@@ -380,7 +544,7 @@ const botSatisfaction = (chatBot) => {
 //              input   = the povocing input
 // output:      number between 0.0 and 1.0
 // sideeffect:  none
-const edgeFactor = (chatBot,speaker,input) => {
+const edgeFactor = (chatBot,message) => {
   return Math.random() * 0.9 ** botArray.length;
 }
 
@@ -391,27 +555,27 @@ const effectiveVerbosity = (chatBot) => {
 // input:       the object of the "persons" to whom it is reacted
 // output:      none
 // sideeffects: bots respond randomly based on their verbosity levels
-const botsReact = (speaker,input) => {
+const botsReact = (inputMessage) => {
   botArray.forEach(x => {
-    if(!x.busy && edgeFactor(x,speaker,input) > effectiveVerbosity(x))
-      botDelayedResponse(x,speaker,input);
+    if(!x.busy && edgeFactor(x,inputMessage) > effectiveVerbosity(x))
+      botDelayedResponse(x,inputMessage);
   });
 }
   
 // INCOMPLETE DOCUMENTATION
 // delayMin/Max in miliseconds
-const botDelayedResponse = (chatBot,speaker,input) => {
+const botDelayedResponse = (chatBot,inputMessage) => {
   if (typeof chatBot !== "object") {
     return;
   }
   chatBot.busy = true;
-  let botResponse = makeBotResponse(chatBot,input);
+  let botResponse = new Message(chatBot,inputMessage.from,"greeting","none");
   setTimeout(() => {
-      postMessage(chatBot,botResponse);
+      postMessage(botResponse);
       chatBot.timeSinceInteraction = 0;
       chatBot.busy = false;
     },
-    botTypingDelay(input,botResponse)
+    botTypingDelay(inputMessage,botResponse)
   );
 }
 
@@ -442,6 +606,9 @@ const randomEventBotJoin = () => {
   }
 }
 
+const randomEventBotsLeave = () => {
+}
+
 const stateProgression = () => {
   setTimeout(() => {
       botArray.forEach(x => {
@@ -456,16 +623,16 @@ const stateProgression = () => {
 
 stateProgression();
 
-
 //// execution: event-listeners ////
 
 $("#chat-form").on("submit", function(event) {
   event.preventDefault();
 
   // Create new message with correct input and append to message-window
-  let inputMessage = $(this).find("input").val();
+  let inputMessage = new Message(human,"none","none","none");
+  inputMessage.content.text($(this).find("input").val());
   clearChatInput();
 
-  postMessage(human,inputMessage);
-  botsReact(human,inputMessage);
+  postMessage(inputMessage);
+  botsReact(inputMessage);
 });

@@ -1,0 +1,24 @@
+[ ] complete documentations
+[ ] implement bots randomly leaving
+[ ] improve random name generation
+[ ] implement message density tracker
+    [ ] influences general verbosity
+[ ] implement friends
+    [ ] likelyhood to respond to friends
+    [ ] mood when responding to friends
+[ ] implement relationships
+    [ ] moves towards 0 over time
+    [ ] influences mood when responding to others
+    [ ] when vey high or very low increases likelyhood to respond
+    [ ] decreases towards spammers
+[ ] implement ignore
+    [ ] sets display: none; for ignored bots messages
+[ ] implement satisfaction
+    [ ] likelyhood to leave
+[*] implement content generation
+    [x] implement class MessageContent
+    [ ] adjust botLeavingProcess
+[ ] implement start-screen
+[ ] implement sounds
+[ ] clean up css
+[ ] update html
