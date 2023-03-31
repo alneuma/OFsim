@@ -1,29 +1,21 @@
-//////////////
-//// BOTS ////
-//////////////
+/////////////////
+//// classes ////
+/////////////////
 
-// ChatBot object randomly join and leave the chat.
-// Every bot in the Chat can, if not busy, randomly post messages
-// Furthermore bots have a chance to respond to human messages
-// and a smaller chance to respond to the messages of other bots
-// We can befriend bots to make it more likely that they will respond to us
-// Befriended bots also will not leave the chat
-// The response a bot gives depends on it's personality
-// Idea to Implement: bot's friendliness towards the human
-class ChatBot {
-  constructor(name, colorPrimary, font, avatar, personality, verbosity) {
+//// ChatParticipant ////
+
+// used as the default class for representing the human chatter
+class ChatParticipant {
+  constructor(name, colorPrimary, font, avatar) {
     this._name = name;
     this._colorPrimary = colorPrimary;
     this._colorSecondary = this.constructor.complementaryColor(colorPrimary);
     this._font = font;
     this._avatar = avatar;
-    this._personality = personality;
-    // lower verbosity: bot speaks more
-    this._verbosity = verbosity
-    this._friend = false;
-    this._busy = false;
+    this._friendsWith = [];
     this._hasGreeted = false;
     this._timeSinceInteraction = 0;
+    this._isHuman = true;
   }
 
   // getters and setters
@@ -32,28 +24,22 @@ class ChatBot {
   get colorSecondary()        { return this._colorSecondary; }
   get font()                  { return this._font; }
   get avatar()                { return this._avatar; }
-  get personality()           { return this._personality; }
-  get verbosity()             { return this._verbosity; }
-  get friend()                { return this._friend; }
-  get busy()                  { return this._busy; }
+  get friendsWith()           { return this._friendsWith; }
   get hasGreeted()            { return this._hasGreeted; }
   get timeSinceInteraction()  { return this._timeSinceInteraction; }
+  get isHuman()               { return this._isHuman; }
 
   set name(name)                                  { this._name = name; }
   set colorPrimary(colorPrimary)                  { this._colorPrimary = colorPrimary; }
   set colorSecondary(colorSecondary)              { this._colorSecondary = colorSecondary; }
   set font(font)                                  { this._font = font; }
   set avatar(avatar)                              { this._avatar = avatar; }
-  set personality(personality)                    { this._personality = personality; }
-  set verbosity(verbosity)                        { this._verbosity = verbosity; }
-  set friend(friend)                              { this._friend = friend; }
-  set busy(busy)                                  { this._busy = busy; }
+  set friendsWith(friendsWith)                    { this._friendsWith = friendsWith; }
   set hasGreeted(hasGreeted)                      { this._hasGreeted = hasGreeted; }
   set timeSinceInteraction(timeSinceInteraction)  { this._timeSinceInteraction = timeSinceInteraction; }
 
   // these arrays save all possible values for the the according bot-characteristics and are used to randomly choose them
-  static _personalityArray = ["emoji","picture","wiki","troll"];
-  static _fontArray = ["monospace","cursive","emoji","math","serif","sans-serif","fantasy"];
+  static _fontArray = ["monospace","cursive","math","serif","sans-serif","fantasy"];
   static _colorArray = ["#FF0000","#FF8000","#FFFF00","#80FF00","#00FF00","#00FF80","#00FFFF","#0080FF","#0000FF","#8000FF","#FF00FF","#FF0080"];
 
   // input:       string representing a color
@@ -72,7 +58,9 @@ class ChatBot {
   // output:      a randomly generated chatters name as a string
   // sideeffects: none
   static randomName() {
-    return "Chatty";
+    let str = Math.floor(Math.random() * 65535).toString(16);
+    console.log(str);
+    return str;
   }
 
   // input:       none
@@ -96,6 +84,50 @@ class ChatBot {
   static randomAvatar() {
     return "";
   }
+
+  static randomHuman() {
+    return new ChatParticipant(this.randomName() + " (You)",
+                               this.randomColor(),
+                               this.randomFont(),
+                               this.randomAvatar());
+  }
+}
+
+//// ChatBot ////
+
+// extends Chat Participant by the following properties:
+// personality
+// verbosity
+// busy
+// relationships
+// stisfaction
+class ChatBot extends ChatParticipant {
+  constructor(name, colorPrimary, font, avatar, personality, verbosity, typingSpeed) {
+    super(name, colorPrimary, font, avatar)
+    this._personality = personality;
+    this._verbosity = verbosity
+    this._typingSpeed = typingSpeed;
+    this._busy = false;
+    this._isHuman = false;
+    this._relationships = [];
+    this._satisfaction = 0;
+  }
+
+  // getters and setters
+  get personality()   { return this._personality; }
+  get verbosity()     { return this._verbosity; }
+  get busy()          { return this._busy; }
+  get tupingSpeed()   { return this._tupingSpeed; }
+  get satisfaction()  { return this._satisfaction; }
+
+  set personality(personality)    { this._personality = personality; }
+  set verbosity(verbosity)        { this._verbosity = verbosity; }
+  set busy(busy)                  { this._busy = busy; }
+  set tupingSpeed(tupingSpeed)    { this._tupingSpeed = tupingSpeed; }
+  set satisfaction(satisfaction)  { this._satisfaction = satisfaction; }
+
+  // these arrays save all possible values for the the according bot-characteristics and are used to randomly choose them
+  static _personalityArray = ["emoji","picture","wiki","troll","spiritual","motivational"];
 
   // input:       none
   // output:      a randomly chose entry from this._personalityArray
@@ -124,15 +156,162 @@ class ChatBot {
   }
 }
 
-// input:       chatBot-object and a message it should respond to as a string
-// output:      the response message of the bot
-// sideeffects: none
-const makeBotResponse = (chatBot,input) => {
-  return "Hello good Sir how are we doing today I was wondering about the state of your juice press which is not uncommen to believe these days in time.";
+/////////////////////////
+//// general control ////
+/////////////////////////
+
+// Formula taken from:
+// https://stackoverflow.com/questions/16110758/generate-random-number-with-a-non-uniform-distribution
+const randomNumber = (bias) => {
+  if (bias === "none") {
+    return Math.random();
+  }
+  let beta = Math.sin(Math.random() * Math.PI / 2) ** 2;
+  if (bias === "polar") {
+    return beta;
+  }
+  else if (bias === "left") {
+    return beta < 0.5 ? 2 * beta : 2 * (1 - beta);
+  }
+  else if (bias === "right") {
+    return beta > 0.5 ? 2 * beta - 1 : 2 * (1 - beta) - 1;
+  }
+  else {
+    return false;
+  }
 }
+
+// input:       none
+// output:      string of format "HH:mm dd/MM/yyyy" representing current (local) time
+// sideeffects: none
+const getTimeString = () => {
+  let date = new Date();
+  return ('0' + date.getHours()).slice(-2) + ":" +
+         ('0' + date.getMinutes()).slice(-2) + " " +
+         ('0' + date.getDate()).slice(-2) + "/" +
+         ('0' + (date.getMonth() + 1)).slice(-2) + "/" +
+         date.getFullYear();
+}
+
+// input:       none
+// output:      undefined
+// sideeffects: clears the chat-input-field
+const clearChatInput = () => {
+  $("#chat-form").find("input").val("");
+};
+
+// input:       jQuery-object
+// output:      undefined
+// sideeffects: scrolls associated DOM element to the bottom
+const scrollToBottom = (jqObject) => {
+  jqObject.scrollTop(jqObject[0].scrollHeight);
+}
+
+// INCOMPLETE DOCUMENTATION
+const sendSystemMessage = (message) => {
+  $("<div>")
+    .addClass("message system-message")
+    .html(getTimeString() + ": " + message)
+    .appendTo($("#message-window"));
+  scrollToBottom($("#message-window"));
+}
+
+// DOCUMENTATION INCOMPLETE
+const addParticipantToScreen = (chatParticipant) => {
+  let $newParticipant = $("<div>")
+                          .addClass("participant")
+                          .attr("id",chatParticipant.name);
+
+  let $newAvatar = $("<img>")
+                      .addClass("participant-avatar")
+                      .attr("src",chatParticipant.avatar)
+                      .attr("alt",chatParticipant.name + "'s avatar");
+
+  let $newName = $("<p>")
+                    .addClass("participant-name")
+                    .css("font-family",chatParticipant.font)
+                    .css("color",chatParticipant.colorSecondary)
+                    .css("background-color",chatParticipant.colorPrimary)
+                    .text(chatParticipant.name);
+
+  $newAvatar.appendTo($newParticipant);
+  $newName.appendTo($newParticipant);
+  $newParticipant.appendTo("#participants-window");
+}
+
+// INCOMPLETE DOCUMENTATION
+// input: string
+// output: jQuery-Object that holds a DOM element that contains a message sent by human of the following format
+//        <div class="bot-message">
+//          <div class="bubble bot-bubble">
+//            <p class="nametag bot-nametag">bot-name</p>
+//            <p class="chat-text bot-chat-text">text</p>
+//            <p class="message-timestamp">time</p>
+//          </div>
+//          <img src="" alt="bot-face" />
+//        </div>
+// sideeffects: none
+//
+// To think about: define helper functions especially for avatar-image
+const makeMessage = (chatParticipant,content) => {
+
+  // make name-tag
+  let $nameTag = $("<p>")
+                    .addClass("nametag")
+                    .css("color",chatParticipant.colorSecondary)
+                    .css("font-famliy",chatParticipant.font)
+                    .text(chatParticipant.name + ":");
+
+  // make chat-text
+  let $newContent = $("<p>")
+                      .addClass("message-content")
+                      .html(content);
+
+  // make timestamp
+  let $newTimestamp = $("<p>")
+                        .addClass("timestamp")
+                        .css("color",chatParticipant.colorSecondary)
+                        .text(getTimeString());
+
+  // make text-bubble
+  let $newBubble = $("<div>")
+                      .css("background-color",chatParticipant.colorPrimary)
+                      .addClass("bubble");
+
+  // add chat-text and timestamp to text-bubble
+  $nameTag.appendTo($newBubble);
+  $newContent.appendTo($newBubble);
+  $newTimestamp.appendTo($newBubble);
+
+  // make message element
+  let $newMessage = $("<div>")
+                      .addClass("message " + (chatParticipant.isHuman ? "human" : "bot") + "-message");
+
+  // add text-bubble and avatar-image to message element
+  $newBubble.appendTo($newMessage);
+  
+  return $newMessage;
+}
+
+// INCOMPLETE DOCUMENTATION
+const postMessage = (chatParticipant,content) => {
+  makeMessage(chatParticipant,content).appendTo($("#message-window"))
+  scrollToBottom($("#message-window"));
+}
+
+/////////////////////
+//// bot control ////
+/////////////////////
 
 // used to store references to all bots in the chat-room
 const botArray = [];
+
+// input:       chatBot-object and a message it should respond to as a string
+// output:      the response message of the bot
+// sideeffects: none
+const makeBotResponse = (chatBot,chatParticipant,input) => {
+  return "Hello good Sir how are we doing today I was wondering about the state of your juice press which is not uncommen to believe these days in time.";
+}
 
 // input:       none
 // output:      reference to a randomly chosen non-busy bot, if no such bot exists return false
@@ -163,206 +342,16 @@ const chooseBot = () => {
 //
 const botEntersChat = () => {
   let newBot = ChatBot.randomBot();
-
-  let $newParticipant = $("<div>")
-                          .addClass("participant")
-                          .attr("id",ChatBot.name);
-
-  let $newAvatar = $("<img>")
-                      .addClass("participant-avatar")
-                      .attr("src",newBot.avatar)
-                      .attr("alt",newBot.name + "'s avatar");
-
-  let $newName = $("<p>")
-                    .addClass("participant-name")
-                    .css("font-family",newBot.font)
-                    .css("color",newBot.colorSecondary)
-                    .css("background-color",newBot.colorPrimary)
-                    .text(newBot.name);
-
-  $newAvatar.appendTo($newParticipant);
-  $newName.appendTo($newParticipant);
-  $newParticipant.appendTo("#participants-window");
-
+  addParticipantToScreen(newBot);
   botArray.push(newBot);
-
   sendSystemMessage("<span style=\"font-family: " + newBot.font + "\">" + newBot.name + "</span> entered the chat.");
-
   return newBot;
 }
 
-// Formula taken from:
-// https://stackoverflow.com/questions/16110758/generate-random-number-with-a-non-uniform-distribution
-const randomNumber = (bias) => {
-  if (bias === "none") {
-    return Math.random();
-  }
-  let beta = Math.sin(Math.random() * Math.PI / 2) ** 2;
-  if (bias === "polar") {
-    return beta;
-  }
-  else if (bias === "left") {
-    return beta < 0.5 ? 2 * beta : 2 * (1 - beta);
-  }
-  else if (bias === "right") {
-    return beta > 0.5 ? 2 * beta - 1 : 2 * (1 - beta) - 1;
-  }
-  else {
-    return false;
-  }
-}
-
-//// time-string ////
-
-// input:       none
-// output:      string of format "HH:mm dd/MM/yyyy" representing current (local) time
-// sideeffects: none
-const getTimeString = () => {
-  let date = new Date();
-  return ('0' + date.getHours()).slice(-2) + ":" +
-         ('0' + date.getMinutes()).slice(-2) + " " +
-         ('0' + date.getDate()).slice(-2) + "/" +
-         ('0' + (date.getMonth() + 1)).slice(-2) + "/" +
-         date.getFullYear();
-}
-
-//// chat-window control ////
-
-// input:       none
-// output:      undefined
-// sideeffects: clears the chat-input-field
-const clearChatInput = () => {
-  $("#chat-form").find("input").val("");
-};
-
-// input:       jQuery-object
-// output:      undefined
-// sideeffects: scrolls associated DOM element to the bottom
-const scrollToBottom = (jqObject) => {
-  jqObject.scrollTop(jqObject[0].scrollHeight);
-}
-
-//// message creation ////
-
-// INCOMPLETE DOCUMENTATION
-// input: string
-// output: jQuery-Object that holds a DOM element that contains a message sent by human of the following format
-//        <div class="human-message">
-//          <div class="bubble human-bubble">
-//            <p class="nametag human-nametag">bot-name</p>
-//            <p class="chat-text human-chat-text">text</p>
-//            <p class="message-timestamp">time</p>
-//          </div>
-//          <img src="" alt="human-face" />
-//        </div>
-// sideeffects: none
-//
-// To think about: define helper functions especially for avatar-image
-const makeHumanMessage = (human,text) => {
-
-  // make name-tag
-  let $nameTag = $("<p>")
-                    .addClass("nametag")
-                    .css("color",human.colorSecondary)
-                    .css("font-famliy",human.font)
-                    .text(human.name + ":");
-
-  // make chat-text
-  let $newText = $("<p>")
-                    .addClass("message-content")
-                    .text(text);
-
-  // make timestamp
-  let $newTimestamp = $("<p>")
-                        .addClass("timestamp")
-                        .css("color",human.colorSecondary)
-                        .text(getTimeString());
-
-  // make text-bubble
-  let $newBubble = $("<div>")
-                      .css("background-color",human.colorPrimary)
-                      //.css("background","linear-gradient(to right," + human.colorPrimary + "," + human.colorSecondary + ")")
-                      .addClass("bubble");
-
-  // add chat-text and timestamp to text-bubble
-  $nameTag.appendTo($newBubble);
-  $newText.appendTo($newBubble);
-  $newTimestamp.appendTo($newBubble);
-
-  // make message element
-  let $newMessage = $("<div>")
-                      .addClass("message human-message");
-
-  // add text-bubble and avatar-image to message element
-  $newBubble.appendTo($newMessage);
-  
-  return $newMessage;
-}
-
-// INCOMPLETE DOCUMENTATION
-const postHumanMessage = (human,humanMessage) => {
-  makeHumanMessage(human,humanMessage).appendTo($("#message-window"))
-  scrollToBottom($("#message-window"));
-}
-
-// INCOMPLETE DOCUMENTATION
-// input: string
-// output: jQuery-Object that holds a DOM element that contains a message sent by human of the following format
-//        <div class="bot-message">
-//          <div class="bubble bot-bubble">
-//            <p class="nametag bot-nametag">bot-name</p>
-//            <p class="chat-text bot-chat-text">text</p>
-//            <p class="message-timestamp">time</p>
-//          </div>
-//          <img src="" alt="bot-face" />
-//        </div>
-// sideeffects: none
-//
-// To think about: define helper functions especially for avatar-image
-const makeBotMessage = (chatBot,content) => {
-
-  // make name-tag
-  let $nameTag = $("<p>")
-                    .addClass("nametag")
-                    .css("color",chatBot.colorSecondary)
-                    .css("font-famliy",chatBot.font)
-                    .text(chatBot.name + ":");
-
-  // make chat-text
-  let $newText = $("<p>")
-                    .addClass("message-content")
-                    .text(content);
-
-  // make timestamp
-  let $newTimestamp = $("<p>")
-                        .addClass("timestamp")
-                        .css("color",chatBot.colorSecondary)
-                        .text(getTimeString());
-
-  // make text-bubble
-  let $newBubble = $("<div>")
-                      .css("background-color",chatBot.colorPrimary)
-                      .addClass("bubble");
-
-  // add chat-text and timestamp to text-bubble
-  $nameTag.appendTo($newBubble);
-  $newText.appendTo($newBubble);
-  $newTimestamp.appendTo($newBubble);
-
-  // make message element
-  let $newMessage = $("<div>")
-                      .addClass("message bot-message");
-
-  // add text-bubble and avatar-image to message element
-  $newBubble.appendTo($newMessage);
-  
-  return $newMessage;
-}
-
-// INCOMPLETE DOCUMENTATION
-const postBotMessage = (chatBot,botMessage) => {
-  makeBotMessage(chatBot,botMessage).appendTo($("#message-window"))
-  scrollToBottom($("#message-window"));
+const botLeavesChat = (chatBot) => {
+  $("#" + chatBot.name).remove();
+  sendSystemMessage("<span style=\"font-family: " + chatBot.font + "\">" + chatBot.name + "</span> has left the chat.");
+  botArray.splice(botArray.find(x => x.name === name),1);
 }
 
 // botTypingDelay()
@@ -374,21 +363,24 @@ const postBotMessage = (chatBot,botMessage) => {
 //              input length is wighted less as the bot's reading speed should
 //              be sumulated faster as the bot's typing speed
 // sideeffects: none
-const botTypingDelay = (input,botMessage) => {
+const botTypingDelay = (chatBot,input,Message) => {
   return 800 + (botMessage.length + input.length / 2)* (Math.floor(Math.random() * 200) + 20)
 }
 
-// edgeLevel()
+const botSatisfaction = (chatBot) => {
+}
+
+// edgeFactor()
 // Used to check how much a bot is povoced to react by a certain message
 // Will be compared against the bots verbosity
-// the higher the edge-level the more likely a bot is to react
+// the higher the edge-factor the more likely a bot is to react
 //
 // input:       chatBot = the bot provoced
 //              speaker = the bot/human provocing with input
 //              input   = the povocing input
 // output:      number between 0.0 and 1.0
 // sideeffect:  none
-const edgeLevel = (chatBot,speaker,input) => {
+const edgeFactor = (chatBot,speaker,input) => {
   return Math.random() * 0.9 ** botArray.length;
 }
 
@@ -401,7 +393,7 @@ const effectiveVerbosity = (chatBot) => {
 // sideeffects: bots respond randomly based on their verbosity levels
 const botsReact = (speaker,input) => {
   botArray.forEach(x => {
-    if(!x.busy && edgeLevel(x,speaker,input) > effectiveVerbosity(x))
+    if(!x.busy && edgeFactor(x,speaker,input) > effectiveVerbosity(x))
       botDelayedResponse(x,speaker,input);
   });
 }
@@ -415,20 +407,12 @@ const botDelayedResponse = (chatBot,speaker,input) => {
   chatBot.busy = true;
   let botResponse = makeBotResponse(chatBot,input);
   setTimeout(() => {
-      postBotMessage(chatBot,botResponse);
+      postMessage(chatBot,botResponse);
       chatBot.timeSinceInteraction = 0;
       chatBot.busy = false;
     },
     botTypingDelay(input,botResponse)
   );
-}
-
-// INCOMPLETE DOCUMENTATION
-const sendSystemMessage = (message) => {
-  $("<div>")
-    .addClass("message system-message")
-    .html(getTimeString() + ": " + message)
-    .appendTo($("#message-window"));
 }
 
 ///////////////////
@@ -438,25 +422,12 @@ const sendSystemMessage = (message) => {
 //// execution: start ////
 sendSystemMessage("welcome");
 
-// specify human carachteristics
-let humanColor = ChatBot.randomColor();
-let human = {
-  colorPrimary: humanColor,
-  colorSecondary: ChatBot.complementaryColor(humanColor),
-  font: "sans-serif",
-  avatar: "",
-  name: "You",
-}
-
-// represent human as a participant
-$("#human .participant-avatar").attr("src",human.Avatar);
-$("#human .participant-name").css("font-family",human.font)
-                             .css("color",human.colorSecondary)
-                             .css("background-color",human.colorPrimary)
-                             .text(human.name);
+let human = ChatParticipant.randomHuman();
+addParticipantToScreen(human);
 
 // set chat-background color accoring to human.colorSecondary
 $("#chat-window").css("background","linear-gradient(to bottom right, #303030, " + human.colorSecondary + ")");
+
 
 // add starting-bots
 botEntersChat();
@@ -465,13 +436,11 @@ botEntersChat();
 
 //// execution: user-independent processes ////
 
-
 const randomEventBotJoin = () => {
   if (0.05 * 0.95 ** botArray.length > randomNumber("none")) {
     botEntersChat();
   }
 }
-
 
 const stateProgression = () => {
   setTimeout(() => {
@@ -497,6 +466,6 @@ $("#chat-form").on("submit", function(event) {
   let inputMessage = $(this).find("input").val();
   clearChatInput();
 
-  postHumanMessage(human,inputMessage);
+  postMessage(human,inputMessage);
   botsReact(human,inputMessage);
 });
