@@ -1,3 +1,18 @@
+//////////////////
+//// settings ////
+//////////////////
+
+// denotes the maximum number of bots reaction to a message sent
+const MAX_BOTS_REACT = 3;
+
+//////////////////////////
+//// global variables ////
+//////////////////////////
+
+// used to store references to all bots in the chat-room
+const botArray = [];
+let human;
+
 ///////////////////////
 //// basic utility ////
 ///////////////////////
@@ -30,6 +45,8 @@ const randomNumber = (bias) => {
 //// ChatParticipant ////
 
 // used as the default class for representing the human chatter
+// relationships: [bool,bool] for human as [friends,ignored]
+//                [int,bool,bool] for bots as [relationship,friends,ignored]
 class ChatParticipant {
   constructor(name, colorPrimary, font, avatar) {
     this._name = name;
@@ -37,8 +54,7 @@ class ChatParticipant {
     this._colorSecondary = this.constructor.complementaryColor(colorPrimary);
     this._font = font;
     this._avatar = avatar;
-    this._friendsWith = [];
-    this._ignored = [];
+    this._relationships = {};
     this._hasGreeted = false;
     this._timeSinceInteraction = 0;
     this._isHuman = true;
@@ -80,11 +96,43 @@ class ChatParticipant {
     return this._colorArray[(colorIndex + Math.floor(colorArrLength / 2)) % colorArrLength];
   }
 
+  static makeRelationships(chatParticipant) {
+    let relationships = {};
+    if (chatParticipant.isHuman) {
+      for (let i = 0; i < botArray.length; i++) {
+        relationships[botArray[i].name] = [false,false];
+      }
+    }
+    else {
+      if (typeof human !== "undefined") {
+        relationships[human.name] = [0,false,false];
+      }
+      for (let i = 0; i < botArray.length; i++) {
+        relationships[botArray[i].name] = [0,false,false];
+      }
+    }
+    return relationships;
+  }
+
   // input:       none
   // output:      a randomly generated chatters name as a string
   // sideeffects: none
   static randomName() {
-    return Math.floor(Math.random() * 65535).toString(16);
+    let keepGoing = true;
+    while (keepGoing) {
+      var name = Math.floor(Math.random() * 65535).toString(16);
+      if (typeof human !== "undefined" && name === human.name) {
+        continue;
+      }
+      keepGoing = false;
+      for (var i = 0; i < botArray.length; i++) {
+        if (name === botArray[i].name) {
+          keepGoing = true;
+          break;
+        }
+      }
+    }
+    return name;
   }
 
   // input:       none
@@ -110,10 +158,12 @@ class ChatParticipant {
   }
 
   static randomHuman() {
-    return new ChatParticipant(this.randomName() + " (You)",
-                               this.randomColor(),
-                               this.randomFont(),
-                               this.randomAvatar());
+    let newHuman = new ChatParticipant(this.randomName(),
+                                       this.randomColor(),
+                                       this.randomFont(),
+                                       this.randomAvatar());
+    newHuman.relationships = this.makeRelationships(newHuman);
+    return newHuman;
   }
 }
 
@@ -133,7 +183,6 @@ class ChatBot extends ChatParticipant {
     this._typingSpeed = typingSpeed;
     this._busy = false;
     this._isHuman = false;
-    this._relationships = [];
     this._satisfaction = 0;
   }
 
@@ -171,12 +220,14 @@ class ChatBot extends ChatParticipant {
   // output:      a ChatBot-object with random features
   // sideeffects: none
   static randomBot() {
-    return new ChatBot(this.randomName(),
-                       this.randomColor(),
-                       this.randomFont(),
-                       this.randomAvatar(),
-                       this.randomPersonality(),
-                       this.randomVerbosity());
+    let newBot = new ChatBot(this.randomName(),
+                             this.randomColor(),
+                             this.randomFont(),
+                             this.randomAvatar(),
+                             this.randomPersonality(),
+                             this.randomVerbosity());
+    newBot.relationships = this.makeRelationships(newBot);
+    return newBot;
   }
 }
 
@@ -228,7 +279,6 @@ class Message {
   }
 
   static makeGreeting(to,mood) {
-    console.log(to);
     if (mood < 0.33) {
       return $("<div>").text(`Oh no! ${to.name} is here!`);
     }
@@ -438,23 +488,12 @@ const makeMessageRepresentation = (message) => {
 const postMessage = (message) => {
   makeMessageRepresentation(message).appendTo($("#message-window"))
   scrollToBottom($("#message-window"));
+  botsReaction(message);
 }
 
 /////////////////////
 //// bot control ////
 /////////////////////
-
-// used to store references to all bots in the chat-room
-const botArray = [];
-
-/*
-// input:       chatBot-object and a message it should respond to as a string
-// output:      the response message of the bot
-// sideeffects: none
-const makeBotResponse = (chatBot,chatParticipant,input) => {
-  return "Hello good Sir how are we doing today I was wondering about the state of your juice press which is not uncommen to believe these days in time.";
-}
-*/
 
 // input:       none
 // output:      reference to a randomly chosen non-busy bot, if no such bot exists return false
@@ -486,18 +525,40 @@ const chooseBot = () => {
 const botEntersChat = () => {
   let newBot = ChatBot.randomBot();
   addParticipantToScreen(newBot);
+  human.relationships[newBot.name] = [false,false];
+  for (let i = 0; i < botArray.length; i++) {
+    botArray[i].relationships[newBot.name] = [0,false,false];
+  }
   botArray.push(newBot);
   sendSystemMessage("<span style=\"font-family: " + newBot.font + "\">" + newBot.name + "</span> entered the chat.");
   return newBot;
 }
 
+const humanEntersChat = () => {
+  newHuman = ChatParticipant.randomHuman();
+  human = newHuman;
+  for (let i = 0; i < botArray.length; i++) {
+    botArray[i].relationships[human.name] = [0,false,false];
+  }
+  addParticipantToScreen(newHuman);
+  sendSystemMessage("welcome");
+  $("#chat-window").css("background","linear-gradient(to bottom right, #303030, " + newHuman.colorSecondary + ")");
+  return newHuman;
+}
+
+/*
 // bot representation is removed from $("#participants-window)
 // and all references to bot get removed
-const botExitChat = (chatBot) => {
+const botExitsChat = (chatBot) => {
   $("#" + chatBot.name).remove();
   sendSystemMessage("<span style=\"font-family: " + chatBot.font + "\">" + chatBot.name + "</span> has left the chat.");
+  for (let i = 0; i < botArray; i++) {
+    delete botArray[i].relationships.(chatBot.name);
+  }
+  delete human.relationships.(chatBot.name);
   botArray.splice(botArray.find(x => x.name === name),1);
 }
+*/
 
 // if chance bot says bye after delay, then leaves after another delay
 // otherwise just leaves after delay
@@ -552,53 +613,59 @@ const effectiveVerbosity = (chatBot) => {
   return chatBot.verbosity * 0.9 ** (chatBot.timeSinceInteraction / 5);
 }
 
-// input:       the object of the "persons" to whom it is reacted
-// output:      none
-// sideeffects: bots respond randomly based on their verbosity levels
-const botsReact = (inputMessage) => {
-  botArray.forEach(x => {
-    if(!x.busy && edgeFactor(x,inputMessage) > effectiveVerbosity(x))
-      botDelayedResponse(x,inputMessage);
-  });
-}
-  
-// INCOMPLETE DOCUMENTATION
-// delayMin/Max in miliseconds
-const botDelayedResponse = (chatBot,inputMessage) => {
-  if (typeof chatBot !== "object") {
-    return;
+const botIsBothered = (chatBot,inputMessage) => {
+  if (chatBot.busy) {
+    return 0.0;
   }
+  return Math.max(randomNumber("left") - chatBot.verbosity, 0.0);
+}
+
+const singleBotReaction = (chatBot,inputMessage) => {
   chatBot.busy = true;
-  let botResponse = new Message(chatBot,inputMessage.from,"greeting","none");
+  let to = inputMessage.from;
+  let type = "greeting";
+  let about = "none";
+  let reactionMessage = new Message(chatBot,to,type,about);
   setTimeout(() => {
-      postMessage(botResponse);
+      postMessage(reactionMessage);
       chatBot.timeSinceInteraction = 0;
       chatBot.busy = false;
     },
-    botTypingDelay(inputMessage,botResponse)
+    botTypingDelay(inputMessage,reactionMessage)
   );
+  return true;
 }
 
-///////////////////
-//// execution ////
-///////////////////
+const compareFirst = (array1,array2) => {
+  if      (array1[0] < array2[0]) return -1;
+  else if (array1[0] > array2[0]) return  1;
+  else                            return  0;
+}
 
-//// execution: start ////
-sendSystemMessage("welcome");
+const getNumMaxIndeces = (num,array) => {
+  let indeces = [];
+  for (var i = 0; i < array.length; i++) {
+    indeces.push([array[i],i]);
+  }
+  return indeces
+          .sort(compareFirst)
+          .slice(0,num)
+          .map(x => x[1]);
+}
 
-let human = ChatParticipant.randomHuman();
-addParticipantToScreen(human);
-
-// set chat-background color accoring to human.colorSecondary
-$("#chat-window").css("background","linear-gradient(to bottom right, #303030, " + human.colorSecondary + ")");
-
-
-// add starting-bots
-botEntersChat();
-botEntersChat();
-botEntersChat();
-
-//// execution: user-independent processes ////
+// input:       the object of the "persons" to whom it is reacted
+// output:      none
+// sideeffects: bots respond randomly based on their verbosity levels
+const botsReaction = (inputMessage) => {
+  let priorities = [];
+  botArray.forEach(bot => {
+    let botherLevel = botIsBothered(bot,inputMessage);
+    if (botherLevel > 0.0) {
+      priorities.push(botherLevel);
+    }
+  });
+  getNumMaxIndeces(MAX_BOTS_REACT,priorities).forEach(i => singleBotReaction(botArray[i],inputMessage));
+}
 
 const randomEventBotJoin = () => {
   if (0.05 * 0.95 ** botArray.length > randomNumber("none")) {
@@ -608,6 +675,10 @@ const randomEventBotJoin = () => {
 
 const randomEventBotsLeave = () => {
 }
+
+///////////////////////////////////
+//// program-state-progression ////
+///////////////////////////////////
 
 const stateProgression = () => {
   setTimeout(() => {
@@ -621,18 +692,26 @@ const stateProgression = () => {
   );
 }
 
+///////////////////
+//// execution ////
+///////////////////
+
+// add starting-participants
+humanEntersChat();
+botEntersChat();
+botEntersChat();
+botEntersChat();
+
+//// execution: user-independent processes ////
+
 stateProgression();
 
 //// execution: event-listeners ////
 
 $("#chat-form").on("submit", function(event) {
   event.preventDefault();
-
-  // Create new message with correct input and append to message-window
   let inputMessage = new Message(human,"none","none","none");
   inputMessage.content.text($(this).find("input").val());
   clearChatInput();
-
   postMessage(inputMessage);
-  botsReact(inputMessage);
 });
