@@ -82,7 +82,7 @@ class ChatParticipant {
 
   // these arrays save all possible values for the the according bot-characteristics and are used to randomly choose them
   static _fontArray = ["monospace","cursive","math","serif","sans-serif","fantasy"];
-  static _colorArray = ["#FF0000","#FF8000","#FFFF00","#80FF00","#00FF00","#00FF80","#00FFFF","#0080FF","#0000FF","#8000FF","#FF00FF","#FF0080"];
+  static _colorArray = ["#FF0000","#FF8000"/*,"#FFFF00"*/,"#80FF00","#00FF00","#00FF80","#00FFFF","#0080FF"/*,"#0000FF"*/,"#8000FF","#FF00FF","#FF0080"];
 
   // input:       string representing a color
   // output:      if input is in this._colorArray, returns the hex code of the complementary color otherwise returns "black"
@@ -386,7 +386,7 @@ const getTimeString = () => {
 // output:      undefined
 // sideeffects: clears the chat-input-field
 const clearChatInput = () => {
-  $("#chat-form").find("input").val("");
+  $("#chat-input").val("");
 };
 
 // input:       jQuery-object
@@ -398,10 +398,20 @@ const scrollToBottom = (jqObject) => {
 
 // INCOMPLETE DOCUMENTATION
 const sendSystemMessage = (html) => {
-  $("<div>")
-    .addClass("message system-message")
-    .html(getTimeString() + ": " + html)
-    .appendTo($("#message-window"));
+  $newMessage = $("<div>")
+                  .addClass("message system-message")
+                  .appendTo($("#message-window"));
+
+  $("<p>")
+    .addClass("system-message-content")
+    .append(html)
+    .appendTo($newMessage);
+
+  $("<span>")
+    .text(getTimeString() + ": ")
+    .addClass("system-message-timestamp")
+    .prependTo($newMessage.find(".system-message-content"));
+
   scrollToBottom($("#message-window"));
 }
 
@@ -416,15 +426,19 @@ const addParticipantToScreen = (chatParticipant) => {
                       .attr("src",chatParticipant.avatar)
                       .attr("alt",chatParticipant.name + "'s avatar");
 
-  let $newName = $("<p>")
-                    .addClass("participant-name")
+  let $newInfo = $("<div>")
+                    .addClass("participant-info")
                     .css("font-family",chatParticipant.font)
                     .css("color",chatParticipant.colorSecondary)
                     .css("background-color",chatParticipant.colorPrimary)
-                    .text(chatParticipant.name);
+
+  let $newName = $("<h3>")
+                      .text(chatParticipant.name);
+
+  $newName.appendTo($newInfo);
 
   $newAvatar.appendTo($newParticipant);
-  $newName.appendTo($newParticipant);
+  $newInfo.appendTo($newParticipant);
   $newParticipant.appendTo("#participants-window");
 }
 
@@ -519,7 +533,7 @@ const chooseBot = () => {
 //
 //              <div class="participant">
 //                <img class="participant-avatar" src="" alt="avatar" />
-//                <p class="participant-name">bot's name</p>
+//                <p class="participant-info">bot's name</p>
 //              </div>
 //
 const botEntersChat = () => {
@@ -542,23 +556,9 @@ const humanEntersChat = () => {
   }
   addParticipantToScreen(newHuman);
   sendSystemMessage("welcome");
-  $("#chat-window").css("background","linear-gradient(to bottom right, #303030, " + newHuman.colorSecondary + ")");
+  $("#message-window").css("background","linear-gradient(to bottom right, #303030, " + newHuman.colorSecondary + ")");
   return newHuman;
 }
-
-/*
-// bot representation is removed from $("#participants-window)
-// and all references to bot get removed
-const botExitsChat = (chatBot) => {
-  $("#" + chatBot.name).remove();
-  sendSystemMessage("<span style=\"font-family: " + chatBot.font + "\">" + chatBot.name + "</span> has left the chat.");
-  for (let i = 0; i < botArray; i++) {
-    delete botArray[i].relationships.(chatBot.name);
-  }
-  delete human.relationships.(chatBot.name);
-  botArray.splice(botArray.find(x => x.name === name),1);
-}
-*/
 
 // if chance bot says bye after delay, then leaves after another delay
 // otherwise just leaves after delay
@@ -711,7 +711,7 @@ stateProgression();
 $("#chat-form").on("submit", function(event) {
   event.preventDefault();
   let inputMessage = new Message(human,"none","none","none");
-  inputMessage.content.text($(this).find("input").val());
+  inputMessage.content.text($(this).find("#chat-input").val());
   clearChatInput();
   postMessage(inputMessage);
 });

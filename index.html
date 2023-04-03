@@ -2,6 +2,7 @@
 <html lang="en-us">
 
   <head>
+
     <title>Assignment Chat</title>
     <meta charset="UTF-8" />
     <!-- line below taken from: https://www.w3schools.com/html/html5_syntax.asp -->
@@ -16,23 +17,19 @@
       <h1>Online-Friends-Simulator</h1>
     </header>
 
-    <section id="main">
+    <div id="main">
 
-      <section id="participants-window">
-      </section>
+      <div id="participants-window">
+      </div>
 
-      <section id="chat-window">
+      <div id="message-window">
+      </div>
 
-        <section id="message-window">
-        </section>
+    </div>
 
-        <form id="chat-form" action="" method="">
-          <input name="chat-input" id="chat-input" placeholder="your message" />
-        </form>
-
-      </section>
-
-    </section>
+    <form id="chat-form" autocomplete="off">
+      <input name="chat-input" id="chat-input" placeholder="your message" />
+    </form>
 
     <footer>
       Copyright/Contact/etc
@@ -40,6 +37,7 @@
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.3/jquery.min.js"></script>
     <script src="./script.js"></script>
+
   </body>
 
 </html>
