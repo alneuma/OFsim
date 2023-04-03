@@ -433,7 +433,7 @@ const addParticipantToScreen = (chatParticipant) => {
                     .css("background-color",chatParticipant.colorPrimary)
 
   let $newName = $("<h3>")
-                      .text(chatParticipant.name);
+                      .text(chatParticipant.name + (chatParticipant.isHuman ? " (You)" : ""));
 
   $newName.appendTo($newInfo);
 

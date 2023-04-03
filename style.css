@@ -57,12 +57,14 @@ footer {
   flex: 1;
   display: flex;
   align-items: center;
+  overflow: scroll;
 }
 
 .participant-info h3 {
   font-weight: bolder;
   font-size: 30px;
-  margin: 20px;
+  margin-left: 15px;
+  white-space: nowrap;
 }
 
 #chat-input {
