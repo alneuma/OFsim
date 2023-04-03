@@ -1,6 +1,7 @@
 [ ] implement first version of singleBotReaction message creation
 [ ] complete documentations
-[ ] implement bots randomly leaving
+[*] implement bots randomly leaving
+    [ ] improve formula (should depend on number of bots in room similar to bots probability of randomly entering the chat)
 [ ] improve random name generation
 [ ] implement message density tracker
     [ ] influences general verbosity
@@ -17,9 +18,9 @@
     [ ] sets display: none; for ignored bots messages
 [ ] implement satisfaction
     [ ] likelyhood to leave
-[*] implement content generation
+[x] implement content generation
     [x] implement class MessageContent
-    [ ] adjust botLeavingProcess
+    [x] adjust botLeavingProcess
 [ ] implement start-screen
 [ ] implement sounds
 [ ] clean up css

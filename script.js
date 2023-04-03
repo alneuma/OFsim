@@ -5,6 +5,35 @@
 // denotes the maximum number of bots reaction to a message sent
 const MAX_BOTS_REACT = 3;
 
+// bot typing speed
+const MIN_TYPING_TIME = 800;
+
+// state-progression
+const STATE_UPDATE_INTERVAL = 1;
+
+// probability for bot to say goodbye when leaving
+const BOT_SAYS_GOODBYE = 0.8;
+
+// With each state-progression there is a chance for a bot to join the room based
+// on the number of bots already present.
+// The following parameters can be manipulated to alter the chance.
+// All of them should be positive numbers.
+//
+// BOT_JOIN_PROBABILITY_BASE      denotes the probability of bots to join a room without any bots
+// BOT_JOIN_PROBABILITY_MIN       denotes the probability for bots to join a full chat-room
+//                                When set equal to BOT_JOIN_PROBABILITY_BASE, probability will always be the same
+//                                independently of the number of bots in the room.
+// BOT_JOIN_PROBABILITY_EXPONENT  determines how aprupt the bot joining will end, when the room gets fuller
+//                                The higher the number the more aprupt the change in probability will happen
+//                                when chat-room approaches fullness.
+//                                When set to 1 the probability will linearly decline from BOT_JOIN_PROBABILITY_BASE to BOT_JOIN_PROBABILITY_MIN
+// BOT_JOIN_CHAT_ROOM_FULL        denotes at which number of bots the probability for new bots to join is at minimum
+//
+const BOT_JOIN_PROBABILITY_BASE = 0.05;
+const BOT_JOIN_PROBABILITY_MIN = 0.001;
+const BOT_JOIN_PROBABILITY_EXPONENT = 2;
+const BOT_JOIN_CHAT_ROOM_FULL = 10;
+
 //////////////////////////
 //// global variables ////
 //////////////////////////
@@ -70,6 +99,7 @@ class ChatParticipant {
   get hasGreeted()            { return this._hasGreeted; }
   get timeSinceInteraction()  { return this._timeSinceInteraction; }
   get isHuman()               { return this._isHuman; }
+  get relationships()         { return this._relationships; }
 
   set name(name)                                  { this._name = name; }
   set colorPrimary(colorPrimary)                  { this._colorPrimary = colorPrimary; }
@@ -79,6 +109,7 @@ class ChatParticipant {
   set friendsWith(friendsWith)                    { this._friendsWith = friendsWith; }
   set hasGreeted(hasGreeted)                      { this._hasGreeted = hasGreeted; }
   set timeSinceInteraction(timeSinceInteraction)  { this._timeSinceInteraction = timeSinceInteraction; }
+  set relationships(relationships)                { this._relationships = relationships; }
 
   // these arrays save all possible values for the the according bot-characteristics and are used to randomly choose them
   static _fontArray = ["monospace","cursive","math","serif","sans-serif","fantasy"];
@@ -183,20 +214,20 @@ class ChatBot extends ChatParticipant {
     this._typingSpeed = typingSpeed;
     this._busy = false;
     this._isHuman = false;
-    this._satisfaction = 0;
+    this._satisfaction = 1;
   }
 
   // getters and setters
   get personality()   { return this._personality; }
   get verbosity()     { return this._verbosity; }
   get busy()          { return this._busy; }
-  get tupingSpeed()   { return this._tupingSpeed; }
+  get typingSpeed()   { return this._typingSpeed; }
   get satisfaction()  { return this._satisfaction; }
 
   set personality(personality)    { this._personality = personality; }
   set verbosity(verbosity)        { this._verbosity = verbosity; }
   set busy(busy)                  { this._busy = busy; }
-  set tupingSpeed(tupingSpeed)    { this._tupingSpeed = tupingSpeed; }
+  set typingSpeed(typingSpeed)    { this._typingSpeed = typingSpeed; }
   set satisfaction(satisfaction)  { this._satisfaction = satisfaction; }
 
   // these arrays save all possible values for the the according bot-characteristics and are used to randomly choose them
@@ -207,6 +238,10 @@ class ChatBot extends ChatParticipant {
   // sideeffects: none
   static randomPersonality() {
     return this._personalityArray[Math.floor(Math.random() * this._personalityArray.length)];
+  }
+
+  static randomTypingSpeed() {
+    return Math.random();
   }
 
   // input:       none
@@ -225,7 +260,8 @@ class ChatBot extends ChatParticipant {
                              this.randomFont(),
                              this.randomAvatar(),
                              this.randomPersonality(),
-                             this.randomVerbosity());
+                             this.randomVerbosity(),
+                             this.randomTypingSpeed());
     newBot.relationships = this.makeRelationships(newBot);
     return newBot;
   }
@@ -274,35 +310,38 @@ class Message {
       case "gossip":      return this.makeGossip(to,about,mood);
       case "initiative":  return this.makeInitiative(to,mood);
       case "goodbye":     return this.makeGoodbye(to,mood);
+      case "none":        return $("<div>");
       default:            return $("<div>");
     }
   }
 
   static makeGreeting(to,mood) {
-    if (mood < 0.33) {
-      return $("<div>").text(`Oh no! ${to.name} is here!`);
-    }
-    else if (mood < 0.66) {
-      return $("<div>").text(`Hey, ${to.name}!`);
+    if (to === "none") {
+      if (mood < 0.33) {
+        return $("<div>").text("I just entered this chat and do already regret it.");
+      }
+      else if (mood < 0.66) {
+        return $("<div>").text("Hey everybody!");
+      }
+      else {
+        return $("<div>").text("Yo yo yo!!!!! What is going on?!!");
+      }
     }
     else {
-      return $("<div>").text(`${to.name}!!!!! I am soooo glad you came!!!`);
+      if (mood < 0.33) {
+        return $("<div>").text(`Oh no! ${to.name} is here!`);
+      }
+      else if (mood < 0.66) {
+        return $("<div>").text(`Hey, ${to.name}!`);
+      }
+      else {
+        return $("<div>").text(`${to.name}!!!!! I am soooo glad you came!!!`);
+      }
     }
   }
 
   static makeGossip(to,about,mood) {
-    if (to !== "none") {
-      if (mood < 0.33) {
-        return $("<div>").text(`Hey ${to.name}, look at ${about.name}! That's a jerk if I have seen one!`);
-      }
-      else if (mood < 0.66) {
-        return $("<div>").text(`Hey ${to.name}, what do you think about ${about.name}?`);
-      }
-      else {
-        return $("<div>").text(`Hey ${to.name} don't you think ${about.name} is just the bet person around?`);
-      }
-    }
-    else {
+    if (about === "none") {
       if (mood < 0.33) {
         return $("<div>").text(`Hey ${to.name}, don't you think, that there are really no decent people around in this chat?`);
       }
@@ -313,10 +352,21 @@ class Message {
         return $("<div>").text(`Hey ${to.name}, isn't it great to be among all these good people in this chat?`);
       }
     }
+    else {
+      if (mood < 0.33) {
+        return $("<div>").text(`Hey ${to.name}, look at ${about.name}! That's a jerk if I have seen one!`);
+      }
+      else if (mood < 0.66) {
+        return $("<div>").text(`Hey ${to.name}, what do you think about ${about.name}?`);
+      }
+      else {
+        return $("<div>").text(`Hey ${to.name} don't you think ${about.name} is just the bet person around?`);
+      }
+    }
   }
 
   static makeInitiative(to,mood) {
-    if (to !== "none") {
+    if (to === "none") {
       if (mood < 0.33) {
         return $("<div>").text(`There is so much lag for me today. I guess there are just too many of you guys.`);
       }
@@ -341,12 +391,12 @@ class Message {
   }
 
   static makeGoodbye(to,mood) {
-    if (to !== "none") {
+    if (to === "none") {
       if (mood < 0.33) {
         return $("<div>").text(`This chat really is the worst! I'm out.`);
       }
       else if (mood < 0.66) {
-        return $("<div>").text(`Gotta get bouncn'`);
+        return $("<div>").text(`Gotta bounce. See you guys around!`);
       }
       else {
         return $("<div>").text(`My heart cries. I have to leave this chat. Goodbye to all my friends!!!!`);
@@ -371,15 +421,15 @@ class Message {
 /////////////////////////
 
 // input:       none
-// output:      string of format "HH:mm dd/MM/yyyy" representing current (local) time
+// output:      string of format "dd/MM/yyyy HH:mm" representing current (local) time
 // sideeffects: none
 const getTimeString = () => {
   let date = new Date();
-  return ('0' + date.getHours()).slice(-2) + ":" +
-         ('0' + date.getMinutes()).slice(-2) + " " +
-         ('0' + date.getDate()).slice(-2) + "/" +
+  return ('0' + date.getDate()).slice(-2) + "/" +
          ('0' + (date.getMonth() + 1)).slice(-2) + "/" +
-         date.getFullYear();
+         date.getFullYear() + " " +
+         ('0' + date.getHours()).slice(-2) + ":" +
+         ('0' + date.getMinutes()).slice(-2)
 }
 
 // input:       none
@@ -549,37 +599,15 @@ const botEntersChat = () => {
 }
 
 const humanEntersChat = () => {
-  newHuman = ChatParticipant.randomHuman();
-  human = newHuman;
+  human = ChatParticipant.randomHuman();
+  addParticipantToScreen(human);
   for (let i = 0; i < botArray.length; i++) {
     botArray[i].relationships[human.name] = [0,false,false];
   }
-  addParticipantToScreen(newHuman);
-  sendSystemMessage("welcome");
-  $("#message-window").css("background","linear-gradient(to bottom right, #303030, " + newHuman.colorSecondary + ")");
-  return newHuman;
-}
-
-// if chance bot says bye after delay, then leaves after another delay
-// otherwise just leaves after delay
-// bot is busy during delays
-const botLeavingProcess = (chatBot) => {
-  chatBot.busy = true;
-  if (randomNumber("none") > 0.5) {
-    let leaveMessage = "Bye!";
-    let writeDelay = botTypingDelay(chatBot,"",leaveMessage) + 1000;
-    setTimeout(() => {
-        postMessage(chatBot,leaveMessage);
-        setTimeout(botExitChat,
-                   randomNumber("left") * 5000 + 2000,
-                   chatBot);
-      },writeDelay);
-  }
-  else {
-    setTimeout(botExitChat,
-               randomNumber("left") * 5000 + 2000,
-               chatBot);
-  }
+  sendSystemMessage("A human with the name <span style =\"font-family: " + human.font + "\">" + human.name + "</span> entered the chat.");
+  sendSystemMessage("Welcome!");
+  $("#message-window").css("background","linear-gradient(to bottom right, #202020, " + human.colorSecondary + ")");
+  return human;
 }
 
 // botTypingDelay()
@@ -592,7 +620,39 @@ const botLeavingProcess = (chatBot) => {
 //              be sumulated faster as the bot's typing speed
 // sideeffects: none
 const botTypingDelay = (inputMessage,botResponse) => {
-  return 800 + (botResponse.content.text().length + inputMessage.content.text().length / 2)* (Math.floor(Math.random() * 200) + 20)
+  return MIN_TYPING_TIME +
+         ((botResponse.content.text().length + inputMessage.content.text().length / 2) * (Math.floor(Math.random() * 200) + 20)) *
+         (botResponse.from.typingSpeed + 1.0);
+}
+
+const botLeavesChat = (chatBot) => {
+  $("#" + chatBot.name).remove();
+  botArray.splice(botArray.findIndex(bot => bot.name === chatBot.name),1);
+  delete human.relationships[chatBot.name];
+  botArray.forEach(bot => delete bot.relationships[chatBot.name]);
+  sendSystemMessage("<span style=\"font-family: " + chatBot.font + "\">" + chatBot.name + "</span> left.");
+}
+
+// if chance bot says bye after delay, then leaves after another delay
+// otherwise just leaves after delay
+// bot is busy during delays
+const botLeavingProcess = (chatBot) => {
+  chatBot.busy = true;
+  if (randomNumber("none") > 1 - BOT_SAYS_GOODBYE) {
+    let leaveMessage = new Message(chatBot,"none","goodbye","none");
+    let writeDelay = botTypingDelay(new Message("none","none","none","none"),leaveMessage) + 1000;
+    setTimeout(() => {
+        postMessage(leaveMessage);
+        setTimeout(botLeavesChat,
+                   randomNumber("left") * 5000 + 2000,
+                   chatBot);
+      },writeDelay);
+  }
+  else {
+    setTimeout(botLeavesChat,
+               randomNumber("none") * 5000 + 2000,
+               chatBot);
+  }
 }
 
 // edgeFactor()
@@ -668,12 +728,19 @@ const botsReaction = (inputMessage) => {
 }
 
 const randomEventBotJoin = () => {
-  if (0.05 * 0.95 ** botArray.length > randomNumber("none")) {
+  if (Math.max(BOT_JOIN_PROBABILITY_BASE *
+               (1 - ((((botArray.length) / BOT_JOIN_CHAT_ROOM_FULL) * Math.sqrt(1 - BOT_JOIN_PROBABILITY_MIN)) ** BOT_JOIN_PROBABILITY_EXPONENT)),
+               BOT_JOIN_PROBABILITY_MIN)
+      > randomNumber("none")) {
     botEntersChat();
   }
 }
 
 const randomEventBotsLeave = () => {
+  botArray
+    .filter(bot => !bot.busy)
+    .filter(bot => randomNumber("right") < 0.1 * bot.satisfaction)
+    .forEach(bot => botLeavingProcess(bot));
 }
 
 ///////////////////////////////////
@@ -683,12 +750,12 @@ const randomEventBotsLeave = () => {
 const stateProgression = () => {
   setTimeout(() => {
       botArray.forEach(x => {
-        x.timeSinceInteraction++;
-      });
+        x.timeSinceInteraction += STATE_UPDATE_INTERVAL; });
+      randomEventBotsLeave();
       randomEventBotJoin();
       stateProgression();
     },
-    1000
+    1000 * STATE_UPDATE_INTERVAL
   );
 }
 
