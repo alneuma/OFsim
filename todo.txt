@@ -1,3 +1,4 @@
+[ ] implement first version of singleBotReaction message creation
 [ ] complete documentations
 [ ] implement bots randomly leaving
 [ ] improve random name generation
@@ -6,11 +7,12 @@
 [ ] implement friends
     [ ] likelyhood to respond to friends
     [ ] mood when responding to friends
-[ ] implement relationships
+[*] implement relationships
     [ ] moves towards 0 over time
     [ ] influences mood when responding to others
     [ ] when vey high or very low increases likelyhood to respond
     [ ] decreases towards spammers
+    [x] relationsship object as ChatParticipant property
 [ ] implement ignore
     [ ] sets display: none; for ignored bots messages
 [ ] implement satisfaction
