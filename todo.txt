@@ -1,28 +1,37 @@
 
+[ ] satisfaction
+    satisfaction should be function of message-density (bad if too high or too low) and average relationship
+
+[ ] likelyhood to leave is influenced by satisfaction
+
+[ ] relationship and satisfaction affect Message._mood
+    
 [ ] bother-level
-[ ] over time relationship adjustment
-[ ] message density
+    function of message-density/relationship/message.to
+
 [ ] initiative
+    function of verbosity/time since interaction/hasGreeted/message-density
+
+[x] over time relationship adjustment
+[x] message density
 
 
-[ ] implement first version of singleBotReaction message creation
-[ ] complete documentations
+[x] implement first version of singleBotReaction message creation
+[ ] complete documentation
 [*] implement bots randomly leaving
-    [ ] improve formula (should depend on number of bots in room similar to bots probability of randomly entering the chat)
+    [x] improve formula (should depend on number of bots in room similar to bots probability of randomly entering the chat)
+    [ ] should depend on a bot's satisfaction
 [ ] improve random name generation
-[ ] implement message density tracker
+[x] implement message density tracker
     [ ] influences general verbosity
-[ ] implement friends
-    [ ] likelyhood to respond to friends
-    [ ] mood when responding to friends
 [*] implement relationships
-    [ ] moves towards 0 over time
+    [x] moves towards 0 over time
     [ ] influences mood when responding to others
     [ ] when vey high or very low increases likelyhood to respond
     [ ] decreases towards spammers
     [x] relationsship object as ChatParticipant property
-[ ] implement ignore
-    [ ] sets display: none; for ignored bots messages
+[ ] implement mute
+    [ ] sets display: none; for muted bot's messages
 [ ] implement satisfaction
     [ ] likelyhood to leave
 [x] implement content generation
@@ -30,5 +39,5 @@
     [x] adjust botLeavingProcess
 [ ] implement start-screen
 [ ] implement sounds
-[ ] clean up css
-[ ] update html
+[x] clean up css
+[x] update html

@@ -10,6 +10,12 @@ const STATE_UPDATE_INTERVAL = 1;
 // number of bots at the beginning
 const STARTING_BOTS_NUMBER = 5;
 
+// amount by which bot relationships approach the default after each STATE_UPDATE_INTERVAL seconds
+const BOT_RELATIONSHIP_DECLINE = 0.5;
+
+// timeframe in seconds to calculate message-density per second
+const MESSAGE_DENSITY_TIMEFRAME = 30;
+
 // bots interacting
 //
 // Parameters influencing the chances for bots reacting to each other or the human or taking initiative for interaction
@@ -38,6 +44,7 @@ const BOT_RELATIONSHIP_ADDRESSING_BONUS = 1.5;
 // BOT_TYPING_TIME_FACTOR_MAX       maximum of the random-factor
 // BOT_TYPING_TIME_FACTOR_MIN       minimum of the random-factor
 // BOT_TYPING_TIME_READING_QUOTIENT see formula for effective-message-length
+//
 const BOT_TYPING_TIME_BASE = 800;
 const BOT_TYPING_TIME_FACTOR_MAX = 200;
 const BOT_TYPING_TIME_FACTOR_MIN = 20;
@@ -57,6 +64,7 @@ const BOT_TYPING_TIME_READING_QUOTIENT = 2
 //                                when chat-room approaches fullness.
 //                                When set to 1 the probability will linearly decline from BOT_JOIN_PROBABILITY_BASE to BOT_JOIN_PROBABILITY_MIN
 // BOT_JOIN_CHAT_ROOM_FULL        denotes at which number of bots the probability for new bots to join is at minimum
+//
 const BOT_JOIN_PROBABILITY_BASE = 0.02;
 const BOT_JOIN_PROBABILITY_MIN = 0.001;
 const BOT_JOIN_PROBABILITY_EXPONENT = 2;
@@ -72,6 +80,7 @@ const BOT_JOIN_CHAT_ROOM_FULL = 10;
 // BOT_LEAVING_DELAY_FACTOR     factor with which the result Math.random() method is multiplied
 //                              to calulate the time in miliseconds added to BOT_LEAVING_DELAY_BASE
 //                              to calculate the total time a bot needs for leaving
+//
 const BOT_LEAVING_PROBABILITY_BASE = 0.01
 const BOT_SAYS_GOODBYE = 0.35;
 const BOT_LEAVING_DELAY_BASE = 2000;
@@ -81,10 +90,19 @@ const BOT_LEAVING_DELAY_FACTOR = 5000;
 //// global variables ////
 //////////////////////////
 
+//// chat participants ////
 // used to store references to all bots in the chat-room
 const botArray = [];
 // reference to the human in the chat-room
 let human;
+
+//// state measurements ////
+const programStartTime = Date.now();
+// timestamps of messages during last MESSAGE_DENSITY_TIMEFRAME seconds
+const timestamps = [];
+// message density in seconds
+// The last MESSAGE_DENSITY_TIMEFRAME seconds are used to calculate this value
+let messageDensity = 0;
 
 ///////////////////////
 //// basic utility ////
@@ -146,31 +164,31 @@ class ChatParticipant {
     this._avatar = avatar;
     this._relationships = {};
     this._hasGreeted = false;
-    this._timeSinceInteraction = 0;
+    this._lastInteractionTime = Date.now();
     this._isHuman = true;
   }
 
   // getters and setters
-  get name()                  { return this._name; }
-  get colorPrimary()          { return this._colorPrimary; }
-  get colorSecondary()        { return this._colorSecondary; }
-  get font()                  { return this._font; }
-  get avatar()                { return this._avatar; }
-  get friendsWith()           { return this._friendsWith; }
-  get hasGreeted()            { return this._hasGreeted; }
-  get timeSinceInteraction()  { return this._timeSinceInteraction; }
-  get isHuman()               { return this._isHuman; }
-  get relationships()         { return this._relationships; }
+  get name()                { return this._name; }
+  get colorPrimary()        { return this._colorPrimary; }
+  get colorSecondary()      { return this._colorSecondary; }
+  get font()                { return this._font; }
+  get avatar()              { return this._avatar; }
+  get friendsWith()         { return this._friendsWith; }
+  get hasGreeted()          { return this._hasGreeted; }
+  get lastInteractionTime() { return this._lastInteractionTime; }
+  get isHuman()             { return this._isHuman; }
+  get relationships()       { return this._relationships; }
 
-  set name(name)                                  { this._name = name; }
-  set colorPrimary(colorPrimary)                  { this._colorPrimary = colorPrimary; }
-  set colorSecondary(colorSecondary)              { this._colorSecondary = colorSecondary; }
-  set font(font)                                  { this._font = font; }
-  set avatar(avatar)                              { this._avatar = avatar; }
-  set friendsWith(friendsWith)                    { this._friendsWith = friendsWith; }
-  set hasGreeted(hasGreeted)                      { this._hasGreeted = hasGreeted; }
-  set timeSinceInteraction(timeSinceInteraction)  { this._timeSinceInteraction = timeSinceInteraction; }
-  set relationships(relationships)                { this._relationships = relationships; }
+  set name(name)                                { this._name = name; }
+  set colorPrimary(colorPrimary)                { this._colorPrimary = colorPrimary; }
+  set colorSecondary(colorSecondary)            { this._colorSecondary = colorSecondary; }
+  set font(font)                                { this._font = font; }
+  set avatar(avatar)                            { this._avatar = avatar; }
+  set friendsWith(friendsWith)                  { this._friendsWith = friendsWith; }
+  set hasGreeted(hasGreeted)                    { this._hasGreeted = hasGreeted; }
+  set lastInteractionTime(lastInteractionTime)  { this._lastInteractionTime = lastInteractionTime; }
+  set relationships(relationships)              { this._relationships = relationships; }
 
   // these arrays save all possible values for the according properties and are used to randomly choose them
   static _fontArray = ["monospace","cursive","math","serif","sans-serif","fantasy"];
@@ -195,15 +213,15 @@ class ChatParticipant {
     let relationships = {};
     if (chatParticipant.isHuman) {
       for (let i = 0; i < botArray.length; i++) {
-        relationships[botArray[i].name] = [false,false];
+        relationships[botArray[i].name] = [false];
       }
     }
     else {
       if (typeof human !== "undefined") {
-        relationships[human.name] = [0,false,false];
+        relationships[human.name] = [0,false];
       }
       for (let i = 0; i < botArray.length; i++) {
-        relationships[botArray[i].name] = [0,false,false];
+        relationships[botArray[i].name] = [0,false];
       }
     }
     return relationships;
@@ -282,7 +300,7 @@ class ChatBot extends ChatParticipant {
     this._typingSpeed = typingSpeed;
     this._busy = false;
     this._isHuman = false;
-    this._satisfaction = 0.5;
+    this._satisfaction = 0;
   }
 
   // getters and setters
@@ -363,6 +381,7 @@ class Message {
     this._about = about;
     this._mood = mood;
     this._content = this.constructor.makeContent(this._from,this._to,this._type,this._about,this._mood);
+    this._time = Date.now();
   }
 
   // setters and getters
@@ -372,6 +391,7 @@ class Message {
   get about()   { return this._about; }
   get mood()    { return this._mood; }
   get content() { return this._content; }
+  get time()    { return this._time; }
 
   set from(from)        { this._from = from; }
   set to(to)            { this._to = to; }
@@ -379,6 +399,7 @@ class Message {
   set about(about)      { this._about = about; }
   set mood(mood)        { this._mood = mood; }
   set content(content)  { this._content = content; }
+  set time(time)        { this._time = time; }
 
   // input:       a reference to a chatParticipant object and a number between 0.0 and 1.0
   // output:      a jquery-object of ._type "greeting"
@@ -679,6 +700,9 @@ const makeMessageRepresentation = (message) => {
 const postMessage = (message) => {
   makeMessageRepresentation(message).appendTo($("#message-window"))
   scrollToBottom($("#message-window"));
+  message.time = Date.now();
+  message.from.lastInteractionTime = message.time;
+  timestamps.push(message.time);
   botsReaction(message);
 }
 
@@ -718,9 +742,9 @@ const chooseBot = () => {
 const botEntersChat = () => {
   let newBot = ChatBot.randomBot();
   addParticipantToScreen(newBot);
-  human.relationships[newBot.name] = [false,false];
+  human.relationships[newBot.name] = [false];
   for (let i = 0; i < botArray.length; i++) {
-    botArray[i].relationships[newBot.name] = [0,false,false];
+    botArray[i].relationships[newBot.name] = [0,false];
   }
   botArray.push(newBot);
   sendSystemMessage("<span style=\"font-family: " + newBot.font + "\">" + newBot.name + "</span> entered the chat.");
@@ -750,7 +774,7 @@ const humanEntersChat = () => {
   human = ChatParticipant.randomHuman();
   addParticipantToScreen(human);
   for (let i = 0; i < botArray.length; i++) {
-    botArray[i].relationships[human.name] = [0,false,false];
+    botArray[i].relationships[human.name] = [0,false];
   }
   sendSystemMessage("A human with the name <span style =\"font-family: " + human.font + "\">" + human.name + "</span> entered the chat.");
   sendSystemMessage("Welcome!");
@@ -833,7 +857,7 @@ const makeReactionMessage = (chatBot,inputMessage) => {
     mood = randomNumber("right");
   }
 
-  if ("goodbye" === inputMessage.type) {
+  if ("goodbye" === inputMessage.type && inputMessage.to === "none") {
     type = "goodbye";
     to = inputMessage.from;
   }
@@ -878,7 +902,6 @@ const singleBotReaction = (chatBot,inputMessage) => {
   let reactionMessage = makeReactionMessage(chatBot,inputMessage);
   setTimeout(() => {
       postMessage(reactionMessage);
-      chatBot.timeSinceInteraction = 0;
       chatBot.busy = false;
     },
     botTypingDelay(inputMessage,reactionMessage)
@@ -951,7 +974,6 @@ const compareFirst = (array1,array2) => {
 //              updates bots relationships
 //              choses the MAX_BOTS_REACT number of botsj
 const botsReaction = (inputMessage) => {
-
   botArray.forEach(bot => {
     if (bot.name !== inputMessage.from.name) {
       updateRelationship(bot,inputMessage);
@@ -973,7 +995,35 @@ const botsReaction = (inputMessage) => {
     .forEach(i => singleBotReaction(botArray[i],inputMessage));
 }
 
-// randomEventBotJoin()
+const updateMessageDensity = () => {
+  let currentTime = Date.now();
+  timestamps.splice(0, timestamps.findIndex(time => time >= currentTime - MESSAGE_DENSITY_TIMEFRAME * 1000));
+  messageDensity = 1000 *
+                   timestamps.length /
+                   ((currentTime - programStartTime < MESSAGE_DENSITY_TIMEFRAME * 1000) ?
+                   currentTime - programStartTime :
+                   MESSAGE_DENSITY_TIMEFRAME * 1000);
+}
+
+const botsRelationshipDecline = () => {
+  botArray.forEach(bot => {
+    let currentRelationshipLevel = 0.0;
+    for (let participant in bot.relationships) {
+      currentRelationshipLevel = bot.relationships[participant][0];
+      if (Math.abs(currentRelationshipLevel) <= BOT_RELATIONSHIP_DECLINE) {
+        bot.relationships[participant][0] = 0;
+      }
+      else if (currentRelationshipLevel < 0) {
+        bot.relationships[participant][0] += BOT_RELATIONSHIP_DECLINE;
+      }
+      else {
+        bot.relationships[participant][0] -= BOT_RELATIONSHIP_DECLINE;
+      }
+    }
+  });
+}
+
+// randomEventBotJoins()
 //
 // Is called via stateProgression() every STATE_UPDATE_INTERVAL (see settings) of seconds.
 // Makes bots randomly join the chat.
@@ -982,7 +1032,7 @@ const botsReaction = (inputMessage) => {
 // output:      undefined
 // sideeffects: randomly determines if a new bot joins the chat, based on the amount of bots already in a room, a couple of constants and
 //              a function with constant exponent.
-const randomEventBotJoin = () => {
+const randomEventBotJoins = () => {
   if (Math.max(BOT_JOIN_PROBABILITY_BASE *
                (1 - ((((botArray.length) / BOT_JOIN_CHAT_ROOM_FULL) * Math.pow(1 - BOT_JOIN_PROBABILITY_MIN, 1/BOT_JOIN_PROBABILITY_EXPONENT)) ** BOT_JOIN_PROBABILITY_EXPONENT)),
                BOT_JOIN_PROBABILITY_MIN)
@@ -990,7 +1040,6 @@ const randomEventBotJoin = () => {
     botEntersChat();
   }
 }
-
 
 // randomEventBotsLeave()
 //
@@ -1023,18 +1072,18 @@ const randomEventBotsTalk = () => {
 //
 // input:       none
 // output:      undefined
-// sideffects:  Updates all the bots ._timeSinceInteraction properties
+// sideffects:  Constantly updates bots relationships.
+//              Keeps track of message density per second.
 //              Makes bots randomly join.
 //              Makes bots randomly leave.
 //              Makes bots randomly interact.
-//              every STATE_UPDATED_INTERVAL (see settings) seconds
-//              Calls itself after finishing.
+//              Calls itself after each STATE_UPDATED_INTERVAL (see settings) seconds.
 const stateProgression = () => {
   setTimeout(() => {
-      botArray.forEach(x => {
-        x.timeSinceInteraction += STATE_UPDATE_INTERVAL; });
       randomEventBotsLeave();
-      randomEventBotJoin();
+      botsRelationshipDecline();
+      randomEventBotJoins();
+      updateMessageDensity();
       randomEventBotsTalk();
       stateProgression();
     },
