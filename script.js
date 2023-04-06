@@ -5,31 +5,85 @@
 // all settings should be positive numbers
 
 // state-progression
+// interval in seconds determining how often the stateProgression() function will get called
+// The stateProgression() function handles all the random events which are not direct reactions to
+// a chat message of another chat-participant and also keeps track of and updates a number of different values
+//
+// When STATE_UPDATE_INTERVAL is changed from the default (1) it is likely, that most other default values 
+// do not work well anymore.
 const STATE_UPDATE_INTERVAL = 1;
 
 // number of bots at the beginning
 const STARTING_BOTS_NUMBER = 5;
 
-// amount by which bot relationships approach the default after each STATE_UPDATE_INTERVAL seconds
-const BOT_RELATIONSHIP_DECLINE = 0.5;
-
 // timeframe in seconds to calculate message-density per second
 const MESSAGE_DENSITY_TIMEFRAME = 30;
 
+// bot relationships
+//
+// each bot has a relationship score for each other chat-participant.
+// It always starts at 0 and will be changing depending on different interactions to a minimum
+// and maximum of -100 and 100
+// Over time, when no meaningful interactions happen, it will always regenerate towards the starting value.
+// The the more extreme a relationship-value already is the less it will change towards one of the extremes.
+//
+// BOT_RELATIONSHIP_ADDRESSING_BONUS Determines how much more drastic the change in relationship is which a bot
+//                                   experiences towards the sender of a message, when it is addressed directly.
+// BOT_RELATIONSHIP_DECLINE          amount by which bot relationships are readjusted towards
+//                                   the starting value during each call of stateProgression()
+const BOT_RELATIONSHIP_ADDRESSING_BONUS = 1.5;
+const BOT_RELATIONSHIP_DECLINE = 0.5;
+
+
+// message-density influence on bot satisfaction
+//
+// The formula is implemented by spamSatisfactionFactor().
+//
+// This is how it interacts with different constants:
+// These constants are used to calculate a factor between 0.0 and 1.0 based on chat-message density.
+// The factor will be multiplied by a bot's satisfacton-score from other scources
+// to calculate the bot's final satisfaction-score.
+// When message-density is below BOT_SATISFACTION_LOW_MESSAGE_DENSITY_THRESHOLD or
+// above BOT_SATISFACTION_HIGH_MESSAGE_DENSITY_THRESHOLD the the factor will be at
+// BOT_SATISFACTION_MESSAGE_DENSITY_MIN. Otherwise the factor will continuously decline,
+// the closer message density gets to one of the thresholds. The factor will be 1 when message
+// density is exactly in the middle between the thresholds.
+// The higher th BOT_SATISFACTION_MESSAGE_DENSITY_EXPONENT the mor apruptly the change from
+// a large factor (close to 1) to a small factor (close to BOT_SATISFACTION_MESSAGE_DENSITY_MIN)
+// will happen.
+//
+// BOT_SATISFACTION_LOW_MESSAGE_DENSITY_THRESHOLD   should be not negative
+// BOT_SATISFACTION_HIGH_MESSAGE_DENSITY_THRESHOLD  should be larger than BOT_SATISFACTION_LOW_MESSAGE_DENSITY_THRESHOLD
+// BOT_SATISFACTION_MESSAGE_DENSITY_MIN             should be a number between 0.0 and 1.0
+// BOT_SATISFACTION_MESSAGE_DENSITY_EXPONENT        should be a positive integer that is even
+const BOT_SATISFACTION_LOW_MESSAGE_DENSITY_THRESHOLD = 0.05;
+const BOT_SATISFACTION_HIGH_MESSAGE_DENSITY_THRESHOLD = 0.7;
+const BOT_SATISFACTION_MESSAGE_DENSITY_MIN = 0.2;
+const BOT_SATISFACTION_MESSAGE_DENSITY_EXPONENT = 6;
+
 // bots interacting
 //
-// Parameters influencing the chances for bots reacting to each other or the human or taking initiative for interaction
-// aswell as the way in which this interaction happens
+// Parameters influencing the chances for bots reacting to each other or the human.
+// This is implemented by calculating a bots bother-level relative to a message.
+// Which is a product of a random-number and a number of other factors.
+// When the bother-level of a bot is higher than the BOT_BOTHER_LEVEL_REACTION_THRESHOLD it will
+// react to the respective message.
 //
-// MAX_BOTS_REACT                     denotes the maximum number of bots reacting to a message sent
-// BOT_REACTION_THRESHOLD             minimum botherLevel (is calculated for each message) a bot needs to have to react to another bots message
-// BOT_BOTHER_LEVEL_ADDRESSING_BONUS  
-// BOT_RELATIONSHIP_ADDRESSING_BONUS  factor with which bots relationship adjustment is modified, when they are addressed directly by a message
-//
+// MAX_BOTS_REACT                               denotes the maximum number of bots reacting to a message sent
+// BOT_BOTHER_LEVEL_REACTION_THRESHOLD          The minimum bother-level needed for a bot to react to a message
+// BOT_BOTHER_LEVEL_MESSAGE_DENSITY_WEIGHT      A high message density makes it less likely for a bot to react.
+//                                              This constant determines how drastic this effect is.
+// BOT_BOTHER_LEVEL_MESSAGE_DENSITY_FACTOR_MIN  If this is zero the chance for bots to reacto to messages, when there
+//                                              is a high message density will always be zero
+//                                              This is NOT the minimum chance for a bot to react, it is the minimum of
+//                                              the messageDensity factor which among other factors determines the likelyhood of a bot to react
+// BOT_BOTHER_LEVEL_ADDRESSING_BONUS            When a bot is directly addressed it is more likely that this bot reacts.
+//                                              This constant determines how drastic this effect is.
 const MAX_BOTS_REACT = 3;
-const BOT_REACTION_THRESHOLD = 0.0;
-const BOT_BOTHER_LEVEL_ADDRESSING_BONUS = 1.5;
-const BOT_RELATIONSHIP_ADDRESSING_BONUS = 1.5;
+const BOT_BOTHER_LEVEL_REACTION_THRESHOLD = 0.1;
+const BOT_BOTHER_LEVEL_MESSAGE_DENSITY_WEIGHT = 2.0;
+const BOT_BOTHER_LEVEL_MESSAGE_DENSITY_FACTOR_MIN = 0.2;
+const BOT_BOTHER_LEVEL_ADDRESSING_BONUS = 2.0;
 
 // bots typing time
 //
@@ -300,7 +354,7 @@ class ChatBot extends ChatParticipant {
     this._typingSpeed = typingSpeed;
     this._busy = false;
     this._isHuman = false;
-    this._satisfaction = 0;
+    this._satisfaction = 0.5;
   }
 
   // getters and setters
@@ -738,7 +792,6 @@ const chooseBot = () => {
 //              to all the .relationships properties (which are objects) of all chat-participants.
 //              Calls sendSystemMessage() with an argument that anounces that somebode with the name
 //              of the randomly generated bot entered the chat.
-//
 const botEntersChat = () => {
   let newBot = ChatBot.randomBot();
   addParticipantToScreen(newBot);
@@ -840,22 +893,20 @@ const botLeavingProcess = (chatBot) => {
   }
 }
 
+// makeReactionMessage()
+//
+// Generates a Message object based as a response from a given chat-bot to an input message.
+// The kind of the generated message is dependent on the chat-bots mood and relationship to
+// the participant the new message will be sent to, as well as on aspects the metadata of the input message.
+//
+// input:       the chat-bot for whom the new message is generated
+//              the message to which the new message constitutes a reaction
+// output:      reference to a message object
+// sideeffects: none
 const makeReactionMessage = (chatBot,inputMessage) => {
-  let mood;
   let type = "none";
   let to = "none";
   let about = "none";
-
-  // setting the mood
-  if (inputMessage.mood < 0.33) {
-    mood = randomNumber("left");
-  }
-  else if (inputMessage.mood <= 0.66) {
-    mood = 1.0 - randomNumber("polar");
-  }
-  else {
-    mood = randomNumber("right");
-  }
 
   if ("goodbye" === inputMessage.type && inputMessage.to === "none") {
     type = "goodbye";
@@ -894,9 +945,36 @@ const makeReactionMessage = (chatBot,inputMessage) => {
     to = inputMessage.from;
   }
 
-  return new Message(chatBot,to,type,about,mood);
+  // setting the mood
+  if (inputMessage.mood < 0.33) {
+    var mood = randomNumber("left");
+  }
+  else if (inputMessage.mood <= 0.66) {
+    var mood = 1.0 - randomNumber("polar");
+  }
+  else {
+    var mood = randomNumber("right");
+  }
+
+  mood *= chatBot.satisfaction + 0.5;
+  if (to !== "none") {
+    mood *= (chatBot.relationships[to.name][0] / 200 + 1.0);
+  }
+
+  return new Message(chatBot,to,type,about,Math.min(mood,1.0));
 }
 
+// singleBotReaction()
+//
+// used to make a single bot react to a message
+//
+// input:       reference to ChatBot whi is reacting to a message
+//              the message the bot is reacting to
+// output:      undefined
+// sideeffects: the bot will post a reaction message generated by
+//              makeReactionMessage() after a delay
+//              by using the postMessage() function.
+//              The delay is calculated with botTypingDelay()
 const singleBotReaction = (chatBot,inputMessage) => {
   chatBot.busy = true;
   let reactionMessage = makeReactionMessage(chatBot,inputMessage);
@@ -906,12 +984,24 @@ const singleBotReaction = (chatBot,inputMessage) => {
     },
     botTypingDelay(inputMessage,reactionMessage)
   );
-  return true;
 }
 
+// updateRelationship()
+//
+// updates the relationship of a bot to a sender of a message
+//
+// input:       chatBot whose relationship to a sender of a message is updated
+//              message which causes the change in relationship
+// output:      undefined
+// sideeffects: the relationship of the bot to the sender of the message changes based
+//              on the messages mood and if the bot is addressed directly or not
+//              The more extreme a relationship-score already is, the less effective new changes
+//              will be. How influencial the direct adressation of a bot is, is determined by
+//              the BOT_RELATIONSHIP_ADDRESSING_BONUS constant (see settings).
 const updateRelationship = (chatBot,message) => {
 
-  if (!botExists(message.from)) {
+  // check if sender still exists and if sender is not muted by the bot
+  if (!botExists(message.from) || chatBot.relationships[message.from.name][1]) {
     return;
   }
 
@@ -945,29 +1035,45 @@ const updateRelationship = (chatBot,message) => {
                                                 relationshipScore;
 }
 
+// botBotherLevel()
+//
 // Used to check how much a bot is povoced to react by a certain message
 // Will be compared against the bots verbosity
 // the higher the edge-factor the more likely a bot is to react
 //
-// input:       chatBot = the bot provoced
-//              speaker = the bot/human provocing with input
-//              input   = the povocing input
+// input:       chatBot      = the bot who might be bothered
+//              inputMessage = the input message that might be bothering
 // output:      number between 0.0 and 1.0
 // sideeffect:  none
 const botBotherLevel = (chatBot,inputMessage) => {
-//  BOT_BOTHER_LEVEL_ADDRESSING_BONUS
-  if (chatBot.busy) {
+  // when chatBot is busy or has the sender of inputMessage muted
+  if (chatBot.busy ||
+      chatBot.name === inputMessage.from.name ||
+      chatBot.relationships[inputMessage.from.name][1]) {
     return 0.0;
   }
-  return Math.max(randomNumber("left") - chatBot.verbosity, 0.0);
+  return randomNumber("none") *
+         (Math.abs(chatBot.relationships[inputMessage.from.name][0]) / 100 + 0.5) *
+         ((chatBot.name === inputMessage.to.name) ? BOT_BOTHER_LEVEL_ADDRESSING_BONUS : 1) *
+         chatBot.verbosity *
+         Math.max(1 - messageDensity * BOT_BOTHER_LEVEL_MESSAGE_DENSITY_WEIGHT, BOT_BOTHER_LEVEL_MESSAGE_DENSITY_FACTOR_MIN);
 }
 
+// compareFirst()
+//
+// input:       two arrays
+// output:      -1 if first element of first array is smaller than first element of second array
+//               1 if it is larger
+//               0 for equality
+// sideffects:  none
 const compareFirst = (array1,array2) => {
   if      (array1[0] < array2[0]) return -1;
   else if (array1[0] > array2[0]) return  1;
   else                            return  0;
 }
 
+// botsReactions()
+//
 // input:       the object of the "persons" to whom it is reacted
 // output:      undefined
 // sideeffects: as a reaction to a message:
@@ -983,7 +1089,7 @@ const botsReaction = (inputMessage) => {
   let priorities = [];
   for (let i = 0; i < botArray.length; i++) {
     let botherLevel = botBotherLevel(botArray[i],inputMessage);
-    if (botherLevel > BOT_REACTION_THRESHOLD) {
+    if (botherLevel > BOT_BOTHER_LEVEL_REACTION_THRESHOLD) {
       priorities.push([botherLevel,i]);
     }
   }
@@ -995,6 +1101,14 @@ const botsReaction = (inputMessage) => {
     .forEach(i => singleBotReaction(botArray[i],inputMessage));
 }
 
+// updateMessageDensity()
+//
+// Updates the global variable messageDensity.
+// Should be called via stateProgression().
+//
+// input:       none
+// output:      undefined
+// sideeffect:  updates the messageDensity global variable
 const updateMessageDensity = () => {
   let currentTime = Date.now();
   timestamps.splice(0, timestamps.findIndex(time => time >= currentTime - MESSAGE_DENSITY_TIMEFRAME * 1000));
@@ -1005,6 +1119,74 @@ const updateMessageDensity = () => {
                    MESSAGE_DENSITY_TIMEFRAME * 1000);
 }
 
+// relationshipSatisfaction()
+//
+// calculates relationship-satisfaction of a single bot
+// should be multiplied with the result of spamSatisfactionFactor()
+// to get the final satisfaction of a bot
+//
+// input:       reference to ChatBot object
+// output:      the bot's relationship-satisfaction
+//              (a number between 0.0 and 1.0)
+// sideeffects: none
+const relationshipSatisfaction = (chatBot) => {
+  let sum = Object
+              .entries(chatBot.relationships)
+              .reduce(participant => {
+                // an entry does not count if respective participant is muted
+                if (participant[1] === true)  return 0;
+                else                          return participant[0];
+              });
+
+  // get the arithmetic mean and convert from the interval (-100,100) to the interval (0,1)
+  return sum / (200 * Object.keys(chatBot.relationships).length) + 0.5;
+}
+
+// spamSatisfactionFactor()
+//
+// Calculates a factor which is used to adjust a bot's
+// relationship-satisfaction. See settings for more detailed information.
+//
+// input:       none
+// output:      number between 0.0 and 1.0 based on current message density
+//              and a number of constants that can be adjusted inthe settings
+// sideeffects: none
+const spamSatisfactionFactor = () => {
+  return Math.max(BOT_SATISFACTION_MESSAGE_DENSITY_MIN,
+                  1 -
+                  (1 - BOT_SATISFACTION_MESSAGE_DENSITY_MIN) *
+                  (2 * (messageDensity - BOT_SATISFACTION_LOW_MESSAGE_DENSITY_THRESHOLD) /
+                       (BOT_SATISFACTION_HIGH_MESSAGE_DENSITY_THRESHOLD - BOT_SATISFACTION_LOW_MESSAGE_DENSITY_THRESHOLD) - 1) **
+                       BOT_SATISFACTION_MESSAGE_DENSITY_EXPONENT);
+}
+
+// updateBotsSatisfaction()
+//
+// should be called by stateProgression()
+// to keep bot-satisfaction up to date
+//
+// input:       none
+// output:      undefined
+// sideeffects: updates all the bot's .satisfaction according to
+//              current parameters
+const updateBotsSatisfaction = () => {
+  let spamFactor = spamSatisfactionFactor();
+  botArray.forEach(bot => {
+    bot.satisfaction = relationshipSatisfaction(bot) * spamFactor;
+  });
+}
+
+// botsRelationshipDecline()
+//
+// manages bots relationships normalizing over time
+// should be called by stateProgression()
+//
+// input:       none
+// output:      undefined
+// sideeffects: Makes each bot's relationships to all the other bots
+//              move towards the default (0) each time it is called.
+//              The amount moved is defined by BOT_RELATIONSHIP_DECLINE
+//              (see settings).
 const botsRelationshipDecline = () => {
   botArray.forEach(bot => {
     let currentRelationshipLevel = 0.0;
@@ -1053,11 +1235,12 @@ const randomEventBotJoins = () => {
 const randomEventBotsLeave = () => {
   botArray
     .filter(bot => !bot.busy)
-    .filter(bot => randomNumber("none") < BOT_LEAVING_PROBABILITY_BASE * (1.0 - bot.satisfaction))
+    .filter(bot => randomNumber("none") < BOT_LEAVING_PROBABILITY_BASE * (1.5 - bot.satisfaction))
     .forEach(bot => botLeavingProcess(bot));
 }
 
 const randomEventBotsTalk = () => {
+  // HERE!!!!!
 }
 
 ///////////////////////////////////
@@ -1076,6 +1259,7 @@ const randomEventBotsTalk = () => {
 //              Keeps track of message density per second.
 //              Makes bots randomly join.
 //              Makes bots randomly leave.
+//              Updates bots satisfaction scores.
 //              Makes bots randomly interact.
 //              Calls itself after each STATE_UPDATED_INTERVAL (see settings) seconds.
 const stateProgression = () => {
@@ -1084,6 +1268,7 @@ const stateProgression = () => {
       botsRelationshipDecline();
       randomEventBotJoins();
       updateMessageDensity();
+      updateBotsSatisfaction();
       randomEventBotsTalk();
       stateProgression();
     },

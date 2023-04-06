@@ -1,16 +1,22 @@
 
-[ ] satisfaction
+[ ] start-screen
+
+[ ] muting
+
+[x] satisfaction
     satisfaction should be function of message-density (bad if too high or too low) and average relationship
+    [ ] should be improved by making bot satisfaction dependent on the number of reactions they get for their messages
 
-[ ] likelyhood to leave is influenced by satisfaction
+[x] likelyhood to leave is influenced by satisfaction
 
-[ ] relationship and satisfaction affect Message._mood
+[x] relationship and satisfaction affect Message._mood
     
-[ ] bother-level
+[x] bother-level
     function of message-density/relationship/message.to
 
 [ ] initiative
     function of verbosity/time since interaction/hasGreeted/message-density
+    randomEventBotsTalk()
 
 [x] over time relationship adjustment
 [x] message density
