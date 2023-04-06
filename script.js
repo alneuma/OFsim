@@ -36,8 +36,30 @@ const BOT_RELATIONSHIP_DECLINE = 0.5;
 
 // bots taking initiative talking
 //
-// BOT_INITIATIVE_MAX_TIME  determines after how many milliseconds all the recently having interacted penalty
-//                          is gone
+// Every stateProgression() each non-busy-bot has the chance to take the initiative talking.
+// This depends on a couple of different factors. Among them the time, the bot has not said anything,
+// if the bot already has greeted, the current message density in the chat, the bot's verbosity etc.
+//
+// BOT_INITIATIVE_MAX_TIME_FOR_MAX_TIME_FACTOR                      time after which the factor for
+//                                                                  not having spoken for a while reaches
+//                                                                  it's maximum (in milliseconds)
+//
+// BOT_INITIATIVE_MIN_TIME_FACTOR                                   minimum value of the time-factor
+//                                                                  (the larger the more likely is the bot to talk)
+//
+// BOT_INITIATIVE_MESSAGE_DENSITY_WEIGHT                            determines how important the message-
+//                                                                  density is when it comes to calculating
+//                                                                  the probability for a bot to speak
+//
+// BOT_INITIATIVE_MESSAGE_DENSITY_FACTOR_MIN                        the minimum of the message-density-factor
+//                                                                  (the larger the more likely is the bot to talk)
+//
+// BOT_INITIATIVE_EAGERNESS_THRESHOLD                               the higher, the more unlikely are bots to talk
+//
+// BOT_INITIATIVE_PROBABILITY_FRACTION_GREETING_IF_NOT_GREETED_YET  These three constants define the relative likelyhood
+// BOT_INITIATIVE_PROBABILITY_FRACTION_GOSSIP                       for different types of messages to be sent
+// BOT_INITIATIVE_PROBABILITY_FRACTION_INITIATIVE                   the likelyhood for a greeting is only given, if the bot has
+//                                                                  not talked yet. In this case it is rather high.
 const BOT_INITIATIVE_MAX_TIME_FOR_MAX_TIME_FACTOR = 20000;
 const BOT_INITIATIVE_MIN_TIME_FACTOR = 0.2
 const BOT_INITIATIVE_MESSAGE_DENSITY_WEIGHT = 1.5;
@@ -93,8 +115,8 @@ const BOT_SATISFACTION_MESSAGE_DENSITY_EXPONENT = 6;
 // BOT_BOTHER_LEVEL_ADDRESSING_BONUS            When a bot is directly addressed it is more likely that this bot reacts.
 //                                              This constant determines how drastic this effect is.
 const MAX_BOTS_REACT = 3;
-const BOT_BOTHER_LEVEL_REACTION_THRESHOLD = 0.1;
-const BOT_BOTHER_LEVEL_MESSAGE_DENSITY_WEIGHT = 2.0;
+const BOT_BOTHER_LEVEL_REACTION_THRESHOLD = 0.2;
+const BOT_BOTHER_LEVEL_MESSAGE_DENSITY_WEIGHT = 3.0;
 const BOT_BOTHER_LEVEL_MESSAGE_DENSITY_FACTOR_MIN = 0.2;
 const BOT_BOTHER_LEVEL_ADDRESSING_BONUS = 2.0;
 
@@ -132,10 +154,10 @@ const BOT_TYPING_TIME_READING_QUOTIENT = 2
 //                                When set to 1 the probability will linearly decline from BOT_JOIN_PROBABILITY_BASE to BOT_JOIN_PROBABILITY_MIN
 // BOT_JOIN_CHAT_ROOM_FULL        denotes at which number of bots the probability for new bots to join is at minimum
 //
-const BOT_JOIN_PROBABILITY_BASE = 0.02;
+const BOT_JOIN_PROBABILITY_BASE = 0.015;
 const BOT_JOIN_PROBABILITY_MIN = 0.001;
 const BOT_JOIN_PROBABILITY_EXPONENT = 2;
-const BOT_JOIN_CHAT_ROOM_FULL = 10;
+const BOT_JOIN_CHAT_ROOM_FULL = 8;
 
 // bots leaving
 //
@@ -148,7 +170,7 @@ const BOT_JOIN_CHAT_ROOM_FULL = 10;
 //                              to calulate the time in miliseconds added to BOT_LEAVING_DELAY_BASE
 //                              to calculate the total time a bot needs for leaving
 //
-const BOT_LEAVING_PROBABILITY_BASE = 0.01
+const BOT_LEAVING_PROBABILITY_BASE = 0.008
 const BOT_SAYS_GOODBYE = 0.35;
 const BOT_LEAVING_DELAY_BASE = 3500;
 const BOT_LEAVING_DELAY_FACTOR = 7000;
@@ -1401,6 +1423,19 @@ const stateProgression = () => {
 ///////////////////
 //// execution ////
 ///////////////////
+
+// start-screen
+$("#button-yes").on("click", function(event) {
+  event.preventDefault();
+  $("#start-screen").remove();
+});
+
+$("#button-no").on("click", function(event) {
+  event.preventDefault();
+  $("#start-screen h2").remove();
+  $(".button-start-screen").remove();
+  $(".button-start-screen").remove();
+});
 
 // add starting-participants
 humanEntersChat();
