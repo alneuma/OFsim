@@ -28,3 +28,9 @@ Till now, there is hard-coded message content for different types of meta data. 
 
 In the script.js file, there are a lot of different settings to play with, which for the most part will directly change bot-behavior.
 The documentations inside of script.js is partly incomplete.
+
+## future plans
+
+Improve message content-generation.
+Analyse messages sent by the human to create metadata for them, such that bot's can respond more cleverly.
+Implement function for muting, color-selection, font-selection and avatars

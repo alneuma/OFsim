@@ -84,8 +84,6 @@ footer p {
   outline: none;
 }
 
-/* messages */
-
 .message {
   margin: 10px;
 }
@@ -110,8 +108,6 @@ footer p {
   bottom: 0px;
 }
 
-/* bubbles */
-
 .bubble {
   margin: 15px;
   padding: 15px;
@@ -128,14 +124,10 @@ footer p {
   text-align: left;
 }
 
-/* name-tags */
-
 .nametag {
   font-weight: bold;
   font-size: 1.6em;
 }
-
-/* chat-text and timestamp */
 
 .message-content {
   margin: 10px 0;
