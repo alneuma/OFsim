@@ -14,7 +14,7 @@
 [x] bother-level
     function of message-density/relationship/message.to
 
-[ ] initiative
+[x] initiative
     function of verbosity/time since interaction/hasGreeted/message-density
     randomEventBotsTalk()
 

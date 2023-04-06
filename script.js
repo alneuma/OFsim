@@ -34,6 +34,19 @@ const MESSAGE_DENSITY_TIMEFRAME = 30;
 const BOT_RELATIONSHIP_ADDRESSING_BONUS = 1.5;
 const BOT_RELATIONSHIP_DECLINE = 0.5;
 
+// bots taking initiative talking
+//
+// BOT_INITIATIVE_MAX_TIME  determines after how many milliseconds all the recently having interacted penalty
+//                          is gone
+const BOT_INITIATIVE_MAX_TIME_FOR_MAX_TIME_FACTOR = 20000;
+const BOT_INITIATIVE_MIN_TIME_FACTOR = 0.2
+const BOT_INITIATIVE_MESSAGE_DENSITY_WEIGHT = 1.5;
+const BOT_INITIATIVE_MESSAGE_DENSITY_FACTOR_MIN = 0.2;
+const BOT_INITIATIVE_EAGERNESS_THRESHOLD = 0.5;
+const BOT_INITIATIVE_PROBABILITY_FRACTION_GREETING_IF_NOT_GREETED_YET = 7;
+const BOT_INITIATIVE_PROBABILITY_FRACTION_GOSSIP = 1;
+const BOT_INITIATIVE_PROBABILITY_FRACTION_INITIATIVE = 1;
+
 
 // message-density influence on bot satisfaction
 //
@@ -137,8 +150,8 @@ const BOT_JOIN_CHAT_ROOM_FULL = 10;
 //
 const BOT_LEAVING_PROBABILITY_BASE = 0.01
 const BOT_SAYS_GOODBYE = 0.35;
-const BOT_LEAVING_DELAY_BASE = 2000;
-const BOT_LEAVING_DELAY_FACTOR = 5000;
+const BOT_LEAVING_DELAY_BASE = 3500;
+const BOT_LEAVING_DELAY_FACTOR = 7000;
 
 //////////////////////////
 //// global variables ////
@@ -461,13 +474,13 @@ class Message {
   static makeGreeting(to,mood) {
     if (to === "none") {
       if (mood < 0.33) {
-        return $("<div>").text("I just entered this chat and do already regret it.");
+        return $("<div>").text("I just entered this chat and already do regret it.");
       }
       else if (mood < 0.66) {
         return $("<div>").text("Hey everybody!");
       }
       else {
-        return $("<div>").text("Yo yo yo!!!!! What is going on?!!");
+        return $("<div>").text("Yo yo yo ma folks!!!!! What is going on?!!");
       }
     }
     else {
@@ -506,7 +519,7 @@ class Message {
         return $("<div>").text(`Hey ${to.name}, what do you think about ${about.name}?`);
       }
       else {
-        return $("<div>").text(`Hey ${to.name} don't you think ${about.name} is just the bet person around?`);
+        return $("<div>").text(`Hey ${to.name} don't you think ${about.name} is just the best person around?`);
       }
     }
   }
@@ -534,7 +547,7 @@ class Message {
         return $("<div>").text(`${to.name} what do you think about marshmallows?`);
       }
       else {
-        return $("<div>").text(`${to.name}, I really like the color you choose! You must be a person culture!`);
+        return $("<div>").text(`${to.name}, I really like the color you chose! You must be a person culture!`);
       }
     }
   }
@@ -764,10 +777,21 @@ const postMessage = (message) => {
 //// bot control ////
 /////////////////////
 
+// botExists()
+//
+// input:       reference to ChatBot-object
+// output:      true if input is element of the botArray
+//              and therefore "exists" in terms of the simulation
+//              false otherwise
+// sideeffects: none
 const botExists = (chatBot) => {
   return botArray.findIndex(bot => bot.name === chatBot.name) !== -1;
 }
 
+// chooseBot()
+//
+// randomly chooses an idle bot
+//
 // input:       none
 // output:      reference to a randomly chosen non-busy bot, if no such bot exists return false
 // sideeffects: none
@@ -778,6 +802,33 @@ const chooseBot = () => {
   }
   let index = Math.floor(randomNumber("none") * idleBotsNumber);
   return botArray.filter(x => !x.busy)[index];
+}
+
+// chooseParticipantButNot()
+//
+// randomly chooses a chat participant, that is not element of the input array
+//
+// input:       array with references to chatParticipants (can be empty)
+// output:      reference to a randomly selected chatParticipant, that
+//              is not in the input array
+// sideeffects: none
+const chooseParticipantButNot = (excluded) => {
+  let excludedCopy = excluded.slice(0);
+  let eligibleParticipants = []
+  for (let i = 0; i < botArray.length; i++) {
+    for (var j = 0; j < excluded.length; j++) {
+      if (botArray[i].name === excluded[j].name) {
+        excluded.splice(j,1);
+      }
+      else {
+        eligibleParticipants.push(botArray[i]);
+      }
+    }
+  }
+  if (excluded.findIndex(participant => participant.name === human.name) === -1) {
+    eligibleParticipants.push(human);
+  }
+  return eligibleParticipants[Math.floor(Math.random() * eligibleParticipants.length)];
 }
 
 // botEntersChat()
@@ -829,8 +880,7 @@ const humanEntersChat = () => {
   for (let i = 0; i < botArray.length; i++) {
     botArray[i].relationships[human.name] = [0,false];
   }
-  sendSystemMessage("A human with the name <span style =\"font-family: " + human.font + "\">" + human.name + "</span> entered the chat.");
-  sendSystemMessage("Welcome!");
+  sendSystemMessage("Welcome human with the name <span style =\"font-family: " + human.font + "\">" + human.name + "</span>.");
   $("#message-window").css("background","linear-gradient(to bottom right, #202020, " + human.colorSecondary + ")");
   return human;
 }
@@ -882,7 +932,7 @@ const botLeavingProcess = (chatBot) => {
     setTimeout(() => {
         postMessage(leaveMessage);
         setTimeout(botLeavesChat,
-                   randomNumber("left") * BOT_LEAVING_DELAY_FACTOR + BOT_LEAVING_DELAY_BASE,
+                   randomNumber("right") * BOT_LEAVING_DELAY_FACTOR + BOT_LEAVING_DELAY_BASE,
                    chatBot);
       },writeDelay);
   }
@@ -956,7 +1006,45 @@ const makeReactionMessage = (chatBot,inputMessage) => {
     var mood = randomNumber("right");
   }
 
-  mood *= chatBot.satisfaction + 0.5;
+  return new Message(chatBot,to,type,about,Math.min(mood,1.0));
+}
+
+const makeInitiativeMessage = (chatBot) => {
+  let type = "none";
+  let to = "none";
+  let about = "none";
+
+  if (!chatBot.hasGreeted) {
+    var probabilityFractionGreeting = BOT_INITIATIVE_PROBABILITY_FRACTION_GREETING_IF_NOT_GREETED_YET;
+  }
+  else {
+    var probabilityFractionGreeting = 0;
+  }
+
+  let probabilitySum = probabilityFractionGreeting +
+                       BOT_INITIATIVE_PROBABILITY_FRACTION_GOSSIP +
+                       BOT_INITIATIVE_PROBABILITY_FRACTION_INITIATIVE;
+
+  let randomSelector = randomNumber("none");
+
+  if (randomSelector < probabilityFractionGreeting / probabilitySum) {
+    type = "greeting";
+  }
+  else if (randomSelector < (probabilityFractionGreeting + BOT_INITIATIVE_PROBABILITY_FRACTION_GOSSIP) / probabilitySum) {
+    type = "gossip";
+    to = chooseParticipantButNot([chatBot]);
+    if (randomNumber("none") > 0.5) {
+      about = chooseParticipantButNot([chatBot,to]);
+    }
+  }
+  else {
+    type = "initiative"
+    if (randomNumber("none") > 0.5) {
+      to = chooseParticipantButNot([chatBot]);
+    }
+  }
+
+  let mood = (1 - randomNumber("polar")) * (chatBot.satisfaction + 0.5);
   if (to !== "none") {
     mood *= (chatBot.relationships[to.name][0] / 200 + 1.0);
   }
@@ -980,6 +1068,7 @@ const singleBotReaction = (chatBot,inputMessage) => {
   let reactionMessage = makeReactionMessage(chatBot,inputMessage);
   setTimeout(() => {
       postMessage(reactionMessage);
+      chatBot.hasGreeted = true;
       chatBot.busy = false;
     },
     botTypingDelay(inputMessage,reactionMessage)
@@ -1099,24 +1188,6 @@ const botsReaction = (inputMessage) => {
     .slice(0,MAX_BOTS_REACT)
     .map(x => x[1])
     .forEach(i => singleBotReaction(botArray[i],inputMessage));
-}
-
-// updateMessageDensity()
-//
-// Updates the global variable messageDensity.
-// Should be called via stateProgression().
-//
-// input:       none
-// output:      undefined
-// sideeffect:  updates the messageDensity global variable
-const updateMessageDensity = () => {
-  let currentTime = Date.now();
-  timestamps.splice(0, timestamps.findIndex(time => time >= currentTime - MESSAGE_DENSITY_TIMEFRAME * 1000));
-  messageDensity = 1000 *
-                   timestamps.length /
-                   ((currentTime - programStartTime < MESSAGE_DENSITY_TIMEFRAME * 1000) ?
-                   currentTime - programStartTime :
-                   MESSAGE_DENSITY_TIMEFRAME * 1000);
 }
 
 // relationshipSatisfaction()
@@ -1239,8 +1310,59 @@ const randomEventBotsLeave = () => {
     .forEach(bot => botLeavingProcess(bot));
 }
 
+const botEagernessLevel = (chatBot) => {
+  if (!botExists(chatBot) || chatBot.busy) {
+    return 0.0;
+  }
+
+  if (!chatBot.hasGreeted) {
+    var timeFactor = 1;
+  }
+  else {
+    var timeFactor = ((1 - BOT_INITIATIVE_MIN_TIME_FACTOR) / BOT_INITIATIVE_MAX_TIME_FOR_MAX_TIME_FACTOR) *
+                     (Date.now() - chatBot.lastInteractionTime) +
+                     BOT_INITIATIVE_MIN_TIME_FACTOR;
+  }
+
+  return randomNumber("none") *
+         timeFactor *
+         chatBot.verbosity *
+         Math.max(1 - messageDensity * BOT_INITIATIVE_MESSAGE_DENSITY_WEIGHT, BOT_INITIATIVE_MESSAGE_DENSITY_FACTOR_MIN);
+}
+
+const singleBotRandomlyTalks = (chatBot) => {
+  if (botEagernessLevel(chatBot) > BOT_INITIATIVE_EAGERNESS_THRESHOLD) {
+
+    chatBot.busy = true;
+    let message = makeInitiativeMessage(chatBot);
+    setTimeout(() => {
+      postMessage(message);
+      chatBot.hasGreeted = true;
+      chatBot.busy = false;
+    }, botTypingDelay(new Message("none","none","none","none",randomNumber("none")),message));
+  }
+}
+
 const randomEventBotsTalk = () => {
-  // HERE!!!!!
+  botArray.forEach(bot => singleBotRandomlyTalks(bot));
+}
+
+// updateMessageDensity()
+//
+// Updates the global variable messageDensity.
+// Should be called via stateProgression().
+//
+// input:       none
+// output:      undefined
+// sideeffect:  updates the messageDensity global variable
+const updateMessageDensity = () => {
+  let currentTime = Date.now();
+  timestamps.splice(0, timestamps.findIndex(time => time >= currentTime - MESSAGE_DENSITY_TIMEFRAME * 1000));
+  messageDensity = 1000 *
+                   timestamps.length /
+                   ((currentTime - programStartTime < MESSAGE_DENSITY_TIMEFRAME * 1000) ?
+                   currentTime - programStartTime :
+                   MESSAGE_DENSITY_TIMEFRAME * 1000);
 }
 
 ///////////////////////////////////
