@@ -1,6 +1,12 @@
 # Online-Friends-Simulator
 
+This is a small webapp that uses bots to simulate a chatroom experience.
 by Alrik Neumann
+
+## disclaimer
+
+This has been written with firefox 102.9.0esr.
+I was surprised to find out, that it looks quite differently on chrome.
 
 ## functionality
 

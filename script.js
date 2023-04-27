@@ -1,3 +1,6 @@
+// Copyright: (c) 2023, Alrik Neumann
+// GNU General Public License v3.0+ (see LICENSE.txt or https://www.gnu.org/licenses/gpl-3.0.txt)
+
 //////////////////
 //// settings ////
 //////////////////
@@ -163,9 +166,12 @@ const BOT_JOIN_CHAT_ROOM_FULL = 8;
 //
 // BOT_LEAVING_PROBABILITY_BASE the base probability for each non-busy bot to initiate it's leaving process
 //                              during each state progression. to get the real probability the bot's satisfaction also matters
+//
 // BOT_SAYS_GOODBYE             Chance for a bot to send a goodbye message when leaving
-// BOT_LEAVING_DELAY_BASE       base time bots will still stat in chat after they decided
+//
+// BOT_LEAVING_DELAY_BASE       base time bots will still stay in chat after they decided
 //                              to leave or after they have sent a goodbye message in miliseconds
+//
 // BOT_LEAVING_DELAY_FACTOR     factor with which the result Math.random() method is multiplied
 //                              to calulate the time in miliseconds added to BOT_LEAVING_DELAY_BASE
 //                              to calculate the total time a bot needs for leaving
@@ -239,11 +245,10 @@ const randomNumber = (bias) => {
 //
 // Most of the properties should be self-explanatory
 // ._relationships takes .name properties of other ChatParticipants as keys and 
-// uses arrays as values. For the human these arrays are of the for [boolean,boolean]
-// where the first bolean denotes if the chatter with the key as the .name is a friend
-// and the second boolean denotes if this chatter is muted.
-// For cat-bots there is an aditional integer-value prepended, which denotes the
-// sympathy a bot has for the respective chatter (negative or positive)
+// uses arrays as values. For the human these arrays are singletons with a boolean
+// that denotes if the respective bot is muted or not.
+// For chat-bots there is an aditional integer-value prepended, which denotes the
+// sympathy a bot has for the respective chatter (negative, positive or zero)
 class ChatParticipant {
   constructor(name, colorPrimary, font, avatar) {
     this._name = name;
