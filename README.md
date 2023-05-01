@@ -1,7 +1,6 @@
-# Online-Friends-Simulator
+# OFsim
 
-This is a small webapp that uses bots to simulate a chatroom experience.
-by Alrik Neumann
+Online-Friends-Sumulator is a small webapp that uses bots to simulate a chatroom experience.
 
 ## disclaimer
 
@@ -35,8 +34,20 @@ Till now, there is hard-coded message content for different types of meta data. 
 In the script.js file, there are a lot of different settings to play with, which for the most part will directly change bot-behavior.
 The documentations inside of script.js is partly incomplete.
 
+## Screenshots
+
+![](./screenshots/online_friends_simulator01.png)
+Ready to start social-life?
+
+![](./screenshots/online_friends_simulator02.png)
+a warm welcome
+
+![](./screenshots/online_friends_simulator03.png)
+having a chat with friends
+
 ## future plans
 
-Improve message content-generation.
-Analyse messages sent by the human to create metadata for them, such that bot's can respond more cleverly.
-Implement function for muting, color-selection, font-selection and avatars
+- improve random bot-name generation
+- improve message content-generation
+- analyse messages sent by the human to create metadata for them, such that bot's can respond more cleverly
+- implement functions for muting, color-selection, font-selection and avatars
